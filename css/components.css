@@ -2,6 +2,7 @@
 .screen {
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 .screen.enter {
   animation: screen-in 0.22s ease-out;
@@ -25,6 +26,7 @@
 }
 .navbar.scrolled {
   background: var(--bar-bg);
+  border-bottom-color: var(--line);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   border-bottom-color: var(--sep);
@@ -63,17 +65,35 @@
   will-change: transform, opacity;
 }
 .large-title h1 {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 34px;
-  line-height: 41px;
-  font-weight: 700;
-  letter-spacing: 0.37px;
+  line-height: 40px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.large-title .star {
+  color: var(--accent);
+  font-size: 22px;
+  vertical-align: 10px;
+  margin-left: 5px;
+  text-shadow: var(--accent-glow);
 }
 .subtitle {
-  margin: 0;
+  margin: 6px 0 4px;
   color: var(--label2);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 400;
+}
+.caps {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--label2);
+}
+.caps.small {
+  font-size: 10px;
 }
 
 /* ---------- Botões ---------- */
@@ -99,7 +119,6 @@
 .icon-btn:active,
 .btn-primary:active,
 .btn-destructive:active,
-.chip:active,
 .fab:active,
 .cell-btn:active,
 .as-btn:active {
@@ -135,11 +154,11 @@
   height: 58px;
   border: 0;
   border-radius: 29px;
-  background: linear-gradient(145deg, var(--accent), var(--accent2));
+  background: var(--accent);
   color: #fff;
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 26px rgba(255, 42, 61, 0.55);
   transition: transform 0.12s, opacity 0.12s;
 }
 .fab svg {
@@ -170,8 +189,7 @@
   border: 0;
   border-radius: 27px;
   background: none;
-  color: var(--label);
-  opacity: 0.85;
+  color: var(--label2);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -183,16 +201,15 @@
   transition: background-color 0.2s, color 0.2s, transform 0.1s;
 }
 .tab svg {
-  width: 25px;
-  height: 25px;
+  width: 23px;
+  height: 23px;
 }
 .tab span {
   white-space: nowrap;
 }
 .tab[aria-selected='true'] {
   color: var(--accent);
-  opacity: 1;
-  background: var(--fill);
+  background: var(--accent-soft);
 }
 .tab:active {
   transform: scale(0.94);
@@ -200,11 +217,20 @@
 
 /* ---------- Listas agrupadas (estilo Definições) ---------- */
 .group-header {
-  padding: 22px 36px 7px;
-  font-size: 13px;
+  padding: 22px 32px 8px;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   color: var(--label2);
-  letter-spacing: -0.08px;
+  letter-spacing: 2.2px;
+}
+.group-header .muted {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.group-header.flush {
+  padding-left: 4px;
 }
 .group-footer {
   margin: 0;
@@ -220,7 +246,8 @@
 .group {
   margin: 0 16px;
   background: var(--bg-elev);
-  border-radius: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
   overflow: hidden;
 }
 .cell {
@@ -257,6 +284,15 @@
   background: transparent;
   outline: none;
 }
+.input-right {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  text-align: right;
+}
 .cell input[type='date'] {
   border: 0;
   background: var(--fill);
@@ -268,7 +304,7 @@
   appearance: none;
 }
 .cell-btn {
-  color: var(--accent);
+  color: #fff;
   transition: background-color 0.15s;
 }
 .cell-btn.destructive {
@@ -292,10 +328,14 @@
 
 /* ---------- Cartões e barras ---------- */
 .card {
-  margin: 10px 16px 0;
+  display: block;
+  width: calc(100% - 32px);
+  margin: 12px 16px 0;
   padding: 16px;
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
   background: var(--bg-elev);
+  text-align: left;
 }
 .muted {
   color: var(--label2);
@@ -314,7 +354,8 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  background: var(--accent);
+  box-shadow: var(--accent-glow);
   transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .bar.big {
@@ -339,14 +380,14 @@
   background: var(--bg-elev);
   font-size: 15px;
 }
-.banner-install {
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
+.banner {
+  border: 1px solid var(--line);
 }
-.banner-icon img {
+.banner-img {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  display: block;
+  flex: none;
 }
 .banner-text {
   flex: 1;
@@ -381,8 +422,14 @@
   margin: 0 0 6px;
   line-height: 1.4;
 }
-.empty-emoji {
-  font-size: 54px;
+.empty-star {
+  font-size: 40px;
+  color: var(--accent);
+  text-shadow: var(--accent-glow);
+}
+.empty.small {
+  padding: 18px 32px;
+  font-size: 15px;
 }
 .fatal {
   padding-top: 30vh;
@@ -392,7 +439,7 @@
 .sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.6);
   opacity: 0;
   transition: opacity 0.35s;
 }
@@ -408,8 +455,9 @@
   display: flex;
   flex-direction: column;
   background: var(--sheet-bg);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.18);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
   transform: translateY(100%);
   transition: transform 0.45s var(--ease-ios);
   will-change: transform;
@@ -489,9 +537,6 @@
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   backdrop-filter: saturate(180%) blur(24px);
 }
-[data-scheme='light'] .as-group {
-  background: rgba(255, 255, 255, 0.88);
-}
 .as-head {
   padding: 14px 16px;
   text-align: center;
@@ -512,7 +557,7 @@
   border: 0;
   border-top: 0.5px solid var(--sep);
   background: none;
-  color: var(--accent);
+  color: #fff;
   font-size: 20px;
 }
 .as-btn.destructive {
@@ -532,10 +577,10 @@
 }
 .segmented {
   display: flex;
-  padding: 2px;
+  padding: 3px;
   min-height: 44px;
-  border-radius: 10px;
-  background: var(--fill);
+  border-radius: 12px;
+  background: var(--sheet-cell);
 }
 .segmented button {
   flex: 1;
@@ -546,70 +591,13 @@
   font-weight: 500;
   transition: background-color 0.2s, box-shadow 0.2s;
 }
-.segmented button[aria-pressed='true'] {
-  background: var(--bg-elev);
-  font-weight: 600;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-}
-[data-scheme='dark'] .segmented button[aria-pressed='true'] {
-  background: #636366;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px;
-}
-.chip {
-  min-height: 44px;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--sheet-cell);
-  font-size: 15px;
-  font-weight: 500;
-  transition: background-color 0.15s, color 0.15s, transform 0.1s;
-}
-.chip[aria-pressed='true'] {
-  background: var(--area);
-  color: #fff;
-}
-
-.diff-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  padding: 0 16px;
-}
-.diff-grid button {
-  min-height: 58px;
-  border: 2px solid transparent;
-  border-radius: 14px;
-  background: var(--sheet-cell);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  transition: border-color 0.15s, transform 0.1s;
-}
-.diff-grid button:active {
-  transform: scale(0.96);
-}
-.diff-grid strong {
-  font-size: 15px;
-}
-.diff-grid small {
-  font-size: 12px;
+.segmented button {
   color: var(--label2);
 }
-.diff-grid button[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--sheet-cell));
+.segmented button[aria-pressed='true'] {
+  background: #2c2c2e;
+  color: #fff;
+  font-weight: 600;
 }
 
 .weekdays {
@@ -630,6 +618,7 @@
 .wd[aria-pressed='true'] {
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 0 12px rgba(255, 42, 61, 0.45);
 }
 .stepper-group {
   margin-top: 12px;
@@ -724,81 +713,6 @@
 .toast.show {
   transform: translate(-50%, 0);
 }
-.xp-float {
-  position: absolute;
-  z-index: 250;
-  transform: translate(-50%, 0);
-  font-weight: 800;
-  font-size: 17px;
-  color: var(--accent);
-  pointer-events: none;
-  animation: xp-float 0.95s ease-out forwards;
-}
-@keyframes xp-float {
-  0% { opacity: 0; transform: translate(-50%, 0) scale(0.7); }
-  20% { opacity: 1; transform: translate(-50%, -14px) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -56px) scale(1); }
-}
-.confetti {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 400;
-  pointer-events: none;
-}
-.levelup {
-  position: absolute;
-  inset: 0;
-  z-index: 350;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.levelup.show {
-  opacity: 1;
-}
-.levelup-card {
-  width: 100%;
-  max-width: 320px;
-  padding: 28px 22px 22px;
-  border-radius: 28px;
-  background: var(--bg-elev);
-  text-align: center;
-  transform: scale(0.8);
-  transition: transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
-}
-.levelup.show .levelup-card {
-  transform: scale(1);
-}
-.levelup-card h2 {
-  margin: 14px 0 6px;
-  font-size: 24px;
-}
-.levelup-card p {
-  margin: 0 0 20px;
-  color: var(--label2);
-}
-.levelup-badge {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto;
-  border-radius: 30px;
-  display: grid;
-  place-items: center;
-  font-size: 44px;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(145deg, var(--accent), var(--accent2));
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 50%, transparent);
-  animation: badge-pop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
-}
-@keyframes badge-pop {
-  from { transform: scale(0.3) rotate(-20deg); }
-}
 .update-pill {
   position: absolute;
   left: 50%;
@@ -809,10 +723,45 @@
   padding: 0 18px;
   border: 0;
   border-radius: 22px;
-  background: var(--label);
-  color: var(--bg);
+  background: var(--accent);
+  color: #fff;
   font-size: 15px;
   white-space: nowrap;
   box-shadow: var(--shadow);
   animation: screen-in 0.3s ease-out;
+}
+
+/* ---------- Brilho de "dia fechado" e frases ---------- */
+.glow-pulse {
+  position: absolute;
+  inset: 0;
+  z-index: 240;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(255, 42, 61, 0.45), transparent 60%);
+  animation: glow-pulse 1.6s ease-out forwards;
+}
+@keyframes glow-pulse {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.whisper {
+  margin: 34px 32px 0;
+  text-align: center;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--label3);
+}
+.toast-icon {
+  color: var(--accent);
+}
+.sec {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 26px 32px 10px;
+}
+.muted.small,
+.small {
+  font-size: 13px;
 }

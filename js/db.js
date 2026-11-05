@@ -1,37 +1,57 @@
 // Camada fina sobre IndexedDB (sem bibliotecas).
-const DB_NAME = 'levelup';
-const DB_VERSION = 1;
+import { migrateV1 } from './engine/habits.js';
 
-// Todas as stores das 5 fases já criadas agora, para evitar migrações mais tarde.
+const DB_NAME = 'levelup';
+const DB_VERSION = 2;
+
+// Stores atuais (events e goals já preparadas para a Fase B).
 export const STORES = {
-  areas: 'id',
+  habits: 'id',
+  checks: 'id', // id = "habitId|AAAA-MM-DD"
+  journal: 'id', // id = data "AAAA-MM-DD" (uma entrada por dia)
+  events: 'id',
   goals: 'id',
-  tasks: 'id',
-  log: 'id',
-  entries: 'id',
-  dayPlans: 'data',
-  reviews: 'id',
-  rewards: 'id',
-  achievements: 'id',
   meta: 'id',
 };
+
+// Stores da versão 1 (gamificada), removidas na migração.
+const OLD_STORES = ['areas', 'tasks', 'log', 'entries', 'dayPlans', 'reviews', 'rewards', 'achievements'];
 
 let dbPromise;
 
 function open() {
   dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
+      const tx = req.transaction;
       for (const [name, keyPath] of Object.entries(STORES)) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath });
       }
+      if (event.oldVersion === 1 && db.objectStoreNames.contains('tasks')) migrateFromV1(db, tx);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('Base de dados bloqueada por outro separador.'));
+    req.onblocked = () => reject(new Error('Fecha a app noutros separadores e tenta outra vez.'));
   });
   return dbPromise;
+}
+
+/** v1 → v2: guarda os hábitos que criaste (e as marcações); o resto sai. */
+function migrateFromV1(db, tx) {
+  const tasksReq = tx.objectStore('tasks').getAll();
+  tasksReq.onsuccess = () => {
+    const logReq = tx.objectStore('log').getAll();
+    logReq.onsuccess = () => {
+      const { habits, checks } = migrateV1(tasksReq.result, logReq.result);
+      habits.forEach((h) => tx.objectStore('habits').put(h));
+      checks.forEach((c) => tx.objectStore('checks').put(c));
+      // Sem hábitos próprios → apaga o "meta" para a app recomeçar com os novos exemplos.
+      if (!habits.length) tx.objectStore('meta').delete('app');
+      else tx.objectStore('meta').put({ id: 'app', criadoEm: new Date().toISOString(), versaoDados: 2 });
+      for (const name of OLD_STORES) if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name);
+    };
+  };
 }
 
 const done = (tx) =>
@@ -50,9 +70,7 @@ export async function getAll(store) {
   });
 }
 
-export async function put(store, value) {
-  return putMany(store, [value]);
-}
+export const put = (store, value) => putMany(store, [value]);
 
 export async function putMany(store, values) {
   const db = await open();

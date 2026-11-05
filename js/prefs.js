@@ -2,15 +2,20 @@
 const KEY = 'levelup:prefs';
 
 const DEFAULTS = {
-  tema: 'auto', // 'auto' | 'light' | 'dark'
+  nome: '', // para a saudação
   som: false,
+  mostrarFrases: true,
+  frases: [], // frases tuas, misturadas com as da app
   ultimoBackup: null, // ISO string
   bannerInstalarFechado: false,
 };
 
 function read() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+    const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    const out = { ...DEFAULTS };
+    for (const k of Object.keys(DEFAULTS)) if (k in saved) out[k] = saved[k];
+    return out;
   } catch {
     return { ...DEFAULTS };
   }
@@ -18,8 +23,7 @@ function read() {
 
 export const prefs = read();
 
-export function setPref(key, value) {
-  prefs[key] = value;
+function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(prefs));
   } catch {
@@ -27,9 +31,13 @@ export function setPref(key, value) {
   }
 }
 
+export function setPref(key, value) {
+  prefs[key] = value;
+  persist();
+}
+
 export function replacePrefs(obj) {
-  Object.assign(prefs, DEFAULTS, obj || {});
-  try {
-    localStorage.setItem(KEY, JSON.stringify(prefs));
-  } catch {}
+  Object.assign(prefs, DEFAULTS);
+  for (const k of Object.keys(DEFAULTS)) if (obj && k in obj) prefs[k] = obj[k];
+  persist();
 }

@@ -1,20 +1,20 @@
 // Arranque da app: ecrãs, tab bar, service worker.
 import { load, subscribe } from './state.js';
 import { todayKey } from './engine/dates.js';
-import { applyTheme } from './ui/theme.js';
 import { initKeyboardHandling } from './ui/sheet.js';
 import { closeOpenRow } from './ui/swipe.js';
 import { ICONS, esc, appRoot } from './ui/dom.js';
 import { createToday } from './screens/today.js';
-import { createCharacter } from './screens/character.js';
+import { createHabits } from './screens/habits.js';
+import { createJournal } from './screens/journal.js';
 import { createPlaceholder } from './screens/placeholder.js';
 
 const TABS = [
   { id: 'today', label: 'Hoje' },
-  { id: 'goals', label: 'Objetivos' },
-  { id: 'character', label: 'Personagem' },
-  { id: 'shop', label: 'Loja' },
-  { id: 'stats', label: 'Estatísticas' },
+  { id: 'agenda', label: 'Agenda' },
+  { id: 'goals', label: 'Metas' },
+  { id: 'habits', label: 'Hábitos' },
+  { id: 'journal', label: 'Diário' },
 ];
 
 const screens = {};
@@ -22,7 +22,7 @@ let current = 'today';
 let lastDay = todayKey();
 
 function buildShell() {
-  document.getElementById('screens').innerHTML = TABS.map((t) => `<section class="screen" id="screen-${t.id}" data-screen="${t.id}" ${t.id === current ? '' : 'hidden'}></section>`).join('');
+  document.getElementById('screens').innerHTML = TABS.map((t) => `<section class="screen" id="screen-${t.id}" ${t.id === current ? '' : 'hidden'}></section>`).join('');
   const bar = document.getElementById('tabbar');
   bar.innerHTML = TABS.map((t) => `
     <button class="tab" type="button" role="tab" data-tab="${t.id}" aria-selected="${t.id === current}">
@@ -35,16 +35,15 @@ function buildShell() {
 
   const $ = (id) => document.getElementById(`screen-${id}`);
   screens.today = createToday($('today'));
-  screens.goals = createPlaceholder($('goals'), { title: 'Objetivos', emoji: '🎯', phase: 2, text: 'Objetivos do mês e da semana, com bosses que perdem vida à medida que avanças.' });
-  screens.character = createCharacter($('character'));
-  screens.shop = createPlaceholder($('shop'), { title: 'Loja', emoji: '🛍️', phase: 3, text: 'Gasta as moedas que ganhas em recompensas que tu escolhes.' });
-  screens.stats = createPlaceholder($('stats'), { title: 'Estatísticas', emoji: '📊', phase: 5, text: 'Taxas de conclusão, heatmap de atividade e evolução do XP.' });
+  screens.agenda = createPlaceholder($('agenda'), { title: 'Agenda', caps: 'Fase B', text: 'Eventos com hora, vista de dia, semana e mês. O teu dia num relance.' });
+  screens.goals = createPlaceholder($('goals'), { title: 'Metas', caps: 'Fase B', text: 'Metas do mês, divididas em metas da semana. Progresso à mão ou automático a partir dos hábitos.' });
+  screens.habits = createHabits($('habits'));
+  screens.journal = createJournal($('journal'));
 }
 
 function show(id) {
   closeOpenRow();
   if (id === current) {
-    // Tocar no separador ativo volta ao topo (como no iOS).
     screens[id].scroller.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
@@ -59,9 +58,7 @@ function show(id) {
   screens[id].render();
 }
 
-function renderAll() {
-  Object.values(screens).forEach((s) => s.render());
-}
+const renderAll = () => Object.values(screens).forEach((s) => s.render());
 
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -81,7 +78,6 @@ async function registerServiceWorker() {
       reloading = true;
       location.reload();
     });
-    // Procura versões novas sempre que a app volta ao primeiro plano.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') reg.update().catch(() => {});
     });
@@ -95,30 +91,29 @@ function showUpdateBanner(onUpdate) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'update-pill';
-  b.innerHTML = '✨ Nova versão disponível · <b>Atualizar</b>';
+  b.innerHTML = '✦ Nova versão · <b>Atualizar</b>';
   b.addEventListener('click', () => { b.disabled = true; onUpdate(); });
   appRoot().append(b);
 }
 
 async function start() {
-  applyTheme();
   initKeyboardHandling();
-  // Evita o zoom por gesto de pinça na app instalada.
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   buildShell();
   try {
     await load();
   } catch (err) {
     console.error(err);
-    document.getElementById('screens').innerHTML = `<div class="empty fatal"><div class="empty-emoji">⚠️</div><h3>Não foi possível abrir os dados</h3><p>${esc(err.message || err)}</p><p>Se estás em navegação privada, abre a app numa janela normal.</p></div>`;
+    document.getElementById('screens').innerHTML = `<div class="empty fatal"><div class="empty-star">✦</div><h3>Não foi possível abrir os dados</h3><p>${esc(err.message || err)}</p><p>Se estás em navegação privada, abre numa janela normal.</p></div>`;
     return;
   }
   subscribe(() => screens[current].render());
+  window.addEventListener('prefs-changed', renderAll);
   renderAll();
   document.addEventListener('visibilitychange', () => {
-    // Mudou o dia enquanto a app estava em segundo plano.
-    if (document.visibilityState === 'visible' && todayKey() !== lastDay) {
-      lastDay = todayKey();
+    if (document.visibilityState === 'visible') {
+      // Mudou o dia (ou a parte do dia) enquanto a app estava fechada.
+      if (todayKey() !== lastDay) lastDay = todayKey();
       renderAll();
     }
   });

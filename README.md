@@ -1,8 +1,9 @@
 # LevelUp 🎮
 
-A tua vida em modo RPG: missões, hábitos, XP e níveis. Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no teu telemóvel.
+Hábitos, metas, agenda e diário — em preto, branco e vermelho. ✦
+Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no teu telemóvel.
 
-**Versão 0.1.0 — Fase 1 (MVP).**
+**Versão 0.2.0 — Fase A** (novo visual, Hoje, Hábitos, Diário, frases). A Fase B traz a Agenda e as Metas.
 
 ---
 
@@ -48,14 +49,14 @@ A tua vida em modo RPG: missões, hábitos, XP e níveis. Uma web app (PWA) feit
 1. Substitui os ficheiros alterados no GitHub (**Add file → Upload files**, arrasta-os e faz **Commit**). Ficheiros com o mesmo nome são substituídos.
 2. **Importante:** abre o `service-worker.js` no GitHub (ícone do lápis ✏️) e muda o número da versão:
    ```js
-   const CACHE_VERSION = 'levelup-v0.1.0';   // → 'levelup-v0.1.1'
+   const CACHE_VERSION = 'levelup-v0.2.0';   // → 'levelup-v0.2.1'
    ```
    Sem este passo, o iPhone continua a mostrar a versão antiga (está guardada em cache para funcionar offline).
 3. Se criares um ficheiro novo, acrescenta-o à lista `ASSETS` nesse mesmo ficheiro.
 4. Espera 1 a 2 minutos pelo GitHub Pages.
 
 ### Forçar o iPhone a carregar a versão nova
-- Abre a app. Em poucos segundos aparece **"✨ Nova versão disponível · Atualizar"** → toca nesse aviso.
+- Abre a app. Em poucos segundos aparece **"✦ Nova versão · Atualizar"** → toca nesse aviso.
 - Se o aviso não aparecer: **fecha a app** (desliza para cima a partir do fundo e atira a LevelUp para fora) e abre-a outra vez. Às vezes são precisas duas aberturas.
 - Último recurso: Definições do iPhone → Apps → Safari → Avançado → Dados de sites → apaga `github.io`. ⚠️ **Isto apaga os dados da app**: faz primeiro **Exportar backup**.
 
@@ -77,15 +78,17 @@ Abre `https://O-TEU-UTILIZADOR.github.io/levelup/tests.html`. Deve aparecer **"T
 
 | Gesto | Ação |
 |---|---|
-| Tocar no círculo | Concluir / desfazer |
-| Deslizar → | Concluir (ou desfazer, se já estiver feita) |
+| Tocar no círculo | Marcar / desmarcar o hábito |
+| Deslizar → | Marcar (ou desmarcar) |
 | Deslizar ← | Editar · Apagar |
-| Tocar na missão | Editar |
-| Botão **+** | Nova missão ou hábito |
+| Tocar no hábito | Editar e ver estatísticas |
+| Botão **+** | Novo hábito |
+| Cartão **Diário** | Escrever o dia (guarda sozinho) |
 | Tocar no separador ativo | Voltar ao topo |
 | Arrastar um painel para baixo | Fechar |
 
-**Regras:** Fácil 10 XP · Média 25 · Difícil 50 · Épica 100. XP para passar do nível *n* ao *n+1* = 100 × n^1.5. Apagar uma missão **não** tira o XP já ganho.
+**Sequências:** dias seguidos a cumprir (hoje por fazer não quebra). Nos hábitos "X por semana", conta semanas seguidas.
+**Frases:** aparecem discretas ao longo da app e mudam com o dia. Acrescenta as tuas em ⚙️ → *As tuas frases*.
 
 ## 📁 Estrutura
 
@@ -98,9 +101,9 @@ css/                  base (cores, tema) · components · screens
 js/app.js             arranque, separadores, atualizações
 js/db.js              IndexedDB
 js/state.js           dados em memória + gravação
-js/engine/            regras (XP, datas, agenda) — funções puras e testadas
+js/engine/            regras (hábitos, sequências, datas, frases) — funções puras e testadas
 js/ui/                bottom sheet, gestos, título grande, efeitos
-js/screens/           ecrãs (Hoje, Personagem, Definições…)
+js/screens/           ecrãs (Hoje, Hábitos, Diário, Definições…)
 icons/                ícones e splash screens
 ```
 

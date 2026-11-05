@@ -1,26 +1,28 @@
-/* ---------- Cores (iOS) e variáveis ---------- */
+/* ---------- Estilo "Starboy": preto, branco e vermelho ---------- */
 :root {
-  --bg: #f2f2f7;
-  --bg-elev: #ffffff;
-  --sheet-bg: #f2f2f7;
-  --sheet-cell: #ffffff;
-  --fill: rgba(120, 120, 128, 0.12);
-  --fill-strong: rgba(120, 120, 128, 0.2);
-  --label: #000000;
-  --label2: rgba(60, 60, 67, 0.6);
-  --label3: rgba(60, 60, 67, 0.3);
-  --sep: rgba(60, 60, 67, 0.22);
-  --accent: #5856d6;
-  --accent2: #af52de;
-  --green: #30b651;
-  --red: #ff3b30;
-  --orange: #ff9500;
-  --gray: #8e8e93;
-  --bar-bg: rgba(249, 249, 249, 0.78);
-  --glass: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.6);
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  --status-scrim: #4b47c9;
+  --bg: #000000;
+  --bg-elev: #0e0e10;
+  --bg-elev2: #161618;
+  --sheet-bg: #0b0b0d;
+  --sheet-cell: #161618;
+  --line: rgba(255, 255, 255, 0.07);
+  --fill: rgba(255, 255, 255, 0.07);
+  --fill-strong: rgba(255, 255, 255, 0.16);
+  --label: #ffffff;
+  --label2: rgba(255, 255, 255, 0.5);
+  --label3: rgba(255, 255, 255, 0.24);
+  --sep: rgba(255, 255, 255, 0.08);
+  --accent: #ff2a3d;
+  --accent-soft: rgba(255, 42, 61, 0.13);
+  --accent-glow: 0 0 14px rgba(255, 42, 61, 0.55);
+  --red: #ff453a;
+  --green: #ff2a3d; /* o "feito" também é vermelho */
+  --orange: #8e8e93;
+  --gray: #3a3a3c;
+  --bar-bg: rgba(0, 0, 0, 0.72);
+  --glass: rgba(24, 24, 26, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -31,34 +33,9 @@
   --kb: 0px;
 
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
-  color-scheme: light;
-}
-
-[data-scheme='dark'] {
-  --bg: #000000;
-  --bg-elev: #1c1c1e;
-  --sheet-bg: #1c1c1e;
-  --sheet-cell: #2c2c2e;
-  --fill: rgba(120, 120, 128, 0.24);
-  --fill-strong: rgba(120, 120, 128, 0.36);
-  --label: #ffffff;
-  --label2: rgba(235, 235, 245, 0.6);
-  --label3: rgba(235, 235, 245, 0.3);
-  --sep: rgba(84, 84, 88, 0.6);
-  --accent: #7d7aff;
-  --accent2: #bf5af2;
-  --green: #30d158;
-  --red: #ff453a;
-  --orange: #ff9f0a;
-  --bar-bg: rgba(22, 22, 24, 0.75);
-  --glass: rgba(44, 44, 46, 0.68);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-  --status-scrim: transparent;
   color-scheme: dark;
 }
 
-/* ---------- Base ---------- */
 *,
 *::before,
 *::after {
@@ -71,15 +48,15 @@ body {
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  background: #000;
 }
 
 body {
-  background: var(--bg);
   color: var(--label);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
   font-size: 17px;
   line-height: 1.29;
-  letter-spacing: -0.41px;
+  letter-spacing: -0.3px;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
@@ -96,6 +73,10 @@ textarea {
   font: inherit;
   font-size: 17px; /* >= 16px: o iOS não faz zoom ao focar */
   color: var(--label);
+  caret-color: var(--accent);
+}
+::placeholder {
+  color: var(--label3);
 }
 
 button {
@@ -122,37 +103,30 @@ button {
   isolation: isolate;
 }
 
+/* Brilho vermelho no topo, por trás de tudo */
+#app::before {
+  content: '';
+  position: absolute;
+  top: -190px;
+  left: -90px;
+  width: 470px;
+  height: 360px;
+  background: radial-gradient(closest-side, rgba(255, 42, 61, 0.26), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* No computador: app centrada, com moldura de telemóvel. */
 @media (min-width: 600px) and (min-height: 700px) and (hover: hover) {
   body {
-    background: radial-gradient(circle at 30% 20%, #e9e8ff, #d6d6de);
-  }
-  [data-scheme='dark'] body {
-    background: radial-gradient(circle at 30% 20%, #22203a, #0b0b0d);
+    background: radial-gradient(circle at 50% 30%, #1d0a0d, #000 70%);
   }
   #app {
     height: min(932px, calc(100dvh - 48px));
     margin: 24px auto;
     border-radius: 48px;
-    box-shadow: 0 0 0 10px #1a1a1c, 0 0 0 11px #3a3a3c, 0 40px 90px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 0 10px #0d0d0d, 0 0 0 11px #2c2c2e, 0 40px 90px rgba(0, 0, 0, 0.6);
     --safe-top: 20px;
-  }
-}
-
-/* Barra de estado do iOS ("black-translucent" = texto branco):
-   no modo claro pomos uma faixa com a cor da app por trás para o texto se ler. */
-.status-scrim {
-  display: none;
-}
-@media (display-mode: standalone) {
-  .status-scrim {
-    display: block;
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: var(--safe-top);
-    background: var(--status-scrim);
-    z-index: 50;
-    pointer-events: none;
   }
 }
 

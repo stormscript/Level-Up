@@ -21,9 +21,9 @@
   <div id="out"></div>
 
   <script type="module">
-    import { xpForNext, levelFromXp, xpForTask, coinsForXp, totalXp, xpByArea, xpOnDate } from './js/engine/xp.js';
-    import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween } from './js/engine/dates.js';
-    import { buildDay, isDoneOn, weekCount, isHabitScheduled } from './js/engine/schedule.js';
+    import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting } from './js/engine/dates.js';
+    import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1 } from './js/engine/habits.js';
+    import { trigger, journalPrompt, closingLine, hash, TRIGGERS, JOURNAL_PROMPTS } from './js/engine/phrases.js';
 
     const groups = [];
     let current;
@@ -35,95 +35,128 @@
     };
     const ok = (v, msg = 'esperado verdadeiro') => { if (!v) throw new Error(msg); };
 
-    // ---------- XP e níveis ----------
-    group('XP e níveis');
-    test('XP para o próximo nível = 100 × n^1.5', () => {
-      eq(xpForNext(1), 100); eq(xpForNext(2), 283); eq(xpForNext(4), 800); eq(xpForNext(10), 3162);
-    });
-    test('0 XP = nível 1', () => eq(levelFromXp(0), { level: 1, xpInLevel: 0, xpForNext: 100, progress: 0 }));
-    test('99 XP = nível 1', () => eq(levelFromXp(99).level, 1));
-    test('100 XP = nível 2 (exatamente na fronteira)', () => { eq(levelFromXp(100).level, 2); eq(levelFromXp(100).xpInLevel, 0); });
-    test('382 XP = nível 2, 282 dentro do nível', () => { eq(levelFromXp(382).level, 2); eq(levelFromXp(382).xpInLevel, 282); });
-    test('383 XP = nível 3', () => eq(levelFromXp(383).level, 3));
-    test('XP negativo ou inválido não rebenta', () => { eq(levelFromXp(-50).level, 1); eq(levelFromXp(undefined).level, 1); });
-    test('Nível é monótono (mais XP nunca baixa o nível)', () => {
-      let prev = 1;
-      for (let xp = 0; xp < 200000; xp += 137) { const l = levelFromXp(xp).level; ok(l >= prev, `baixou em ${xp}`); prev = l; }
-    });
-    test('Soma dos XP até ao nível 10 bate certo', () => {
-      let sum = 0; for (let n = 1; n < 10; n++) sum += xpForNext(n);
-      eq(levelFromXp(sum).level, 10); eq(levelFromXp(sum - 1).level, 9);
-    });
-    test('XP por dificuldade: 10 / 25 / 50 / 100', () => {
-      eq(['facil', 'media', 'dificil', 'epica'].map((d) => xpForTask({ dificuldade: d })), [10, 25, 50, 100]);
-    });
-    test('Prioridade do dia vale XP a dobrar', () => eq(xpForTask({ dificuldade: 'dificil' }, { priority: true }), 100));
-    test('Valores de XP personalizados', () => eq(xpForTask({ dificuldade: 'facil' }, { values: { facil: 15 } }), 15));
-    test('Moedas: 1 por cada 5 XP', () => { eq(coinsForXp(10), 2); eq(coinsForXp(25), 5); eq(coinsForXp(100), 20); });
-    test('Totais a partir do histórico', () => {
-      const log = [{ xp: 10, areaId: 'a', data: '2026-11-05' }, { xp: 25, areaId: 'b', data: '2026-11-05' }, { xp: 50, areaId: 'a', data: '2026-11-04' }];
-      eq(totalXp(log), 85); eq(xpByArea(log), { a: 60, b: 25 }); eq(xpOnDate(log, '2026-11-05'), 35);
-    });
+    // Ajudas
+    const H = (id, rec = { tipo: 'diario' }, extra = {}) => ({ id, nome: id, recorrencia: rec, criadaEm: '2026-10-01', ...extra });
+    const idxOf = (pairs) => makeIndex(pairs.map(([habitId, data]) => ({ habitId, data })));
+    const days = (id, from, n) => Array.from({ length: n }, (_, i) => [id, addDays(from, i)]);
+    const THU = '2026-11-05'; // quinta-feira
 
     // ---------- Datas ----------
     group('Datas');
     test('toKey / fromKey ida e volta', () => eq(toKey(fromKey('2026-02-28')), '2026-02-28'));
     test('addDays muda de mês e de ano', () => { eq(addDays('2026-01-31', 1), '2026-02-01'); eq(addDays('2026-12-31', 1), '2027-01-01'); eq(addDays('2026-03-01', -1), '2026-02-28'); });
-    test('addDays atravessa a mudança de hora (DST)', () => { eq(addDays('2026-03-28', 2), '2026-03-30'); eq(addDays('2026-10-24', 2), '2026-10-26'); });
-    test('Dia da semana: 1 = segunda, 7 = domingo', () => { eq(weekday('2026-11-02'), 1); eq(weekday('2026-11-05'), 4); eq(weekday('2026-11-08'), 7); });
+    test('addDays atravessa a mudança de hora', () => { eq(addDays('2026-03-28', 2), '2026-03-30'); eq(addDays('2026-10-24', 2), '2026-10-26'); });
+    test('Dia da semana: 1 = segunda, 7 = domingo', () => { eq(weekday('2026-11-02'), 1); eq(weekday(THU), 4); eq(weekday('2026-11-08'), 7); });
     test('A semana começa à segunda', () => { eq(weekStart('2026-11-08'), '2026-11-02'); eq(weekStart('2026-11-02'), '2026-11-02'); });
-    test('Semana ISO', () => { eq(weekKey('2026-11-05'), '2026-W45'); eq(weekKey('2026-01-01'), '2026-W01'); eq(weekKey('2024-12-30'), '2025-W01'); eq(weekKey('2021-01-03'), '2020-W53'); });
-    test('Mês e diferença de dias', () => { eq(monthKey('2026-11-05'), '2026-11'); eq(daysBetween('2026-11-01', '2026-11-05'), 4); });
+    test('Semana ISO', () => { eq(weekKey(THU), '2026-W45'); eq(weekKey('2026-01-01'), '2026-W01'); eq(weekKey('2024-12-30'), '2025-W01'); });
+    test('Mês, diferença de dias e etiqueta', () => { eq(monthKey(THU), '2026-11'); eq(daysBetween('2026-11-01', THU), 4); eq(capsDate(THU), 'quinta · 5 de novembro'); });
+    test('Saudação por hora', () => {
+      eq(greeting(new Date(2026, 10, 5, 8)), 'Bom dia'); eq(greeting(new Date(2026, 10, 5, 15)), 'Boa tarde');
+      eq(greeting(new Date(2026, 10, 5, 22)), 'Boa noite'); eq(greeting(new Date(2026, 10, 5, 3)), 'Boa noite');
+    });
 
-    // ---------- Agenda do dia ----------
-    group('Hábitos e missões do dia');
-    const H = (id, rec, extra = {}) => ({ id, titulo: id, tipo: 'habito', areaId: 'a', dificuldade: 'media', recorrencia: rec, ...extra });
-    const M = (id, data) => ({ id, titulo: id, tipo: 'pontual', areaId: 'a', dificuldade: 'facil', data });
-    const C = (taskId, data) => ({ tipo: 'concluir', taskId, data, xp: 10 });
-    const ids = (items) => items.map((i) => i.task.id);
-    const THU = '2026-11-05';
+    // ---------- Agenda dos hábitos ----------
+    group('Hábitos do dia');
+    test('Diário aparece todos os dias', () => eq(todayList([H('a')], new Set(), THU).length, 1));
+    test('Dias específicos (Seg/Qua/Sex)', () => {
+      const h = H('x', { tipo: 'dias', dias: [1, 3, 5] });
+      ok(isScheduled(h, '2026-11-02')); ok(!isScheduled(h, THU)); ok(isScheduled(h, '2026-11-06'));
+    });
+    test('Não aparece antes de ter sido criado', () => eq(todayList([H('a', undefined, { criadaEm: '2026-11-06' })], new Set(), THU).length, 0));
+    test('Arquivado não aparece', () => eq(todayList([H('a', undefined, { arquivado: true })], new Set(), THU).length, 0));
+    test('X por semana: aparece até cumprir a meta', () => {
+      const h = H('g', { tipo: 'xPorSemana', n: 2 });
+      eq(todayList([h], idxOf([['g', '2026-11-02']]), THU)[0].week, { count: 1, n: 2 });
+      eq(todayList([h], idxOf([['g', '2026-11-02'], ['g', '2026-11-03']]), THU).length, 0);
+    });
+    test('X por semana: marcado hoje continua visível', () => {
+      const l = todayList([H('g', { tipo: 'xPorSemana', n: 2 })], idxOf([['g', '2026-11-02'], ['g', THU]]), THU);
+      eq(l.length, 1); ok(l[0].done);
+    });
+    test('X por semana recomeça à segunda', () => {
+      const idx = idxOf([['g', '2026-11-02'], ['g', '2026-11-03']]);
+      eq(weekCount(idx, H('g'), '2026-11-08'), 2); eq(weekCount(idx, H('g'), '2026-11-09'), 0);
+    });
+    test('Ordenação: por fazer primeiro', () => {
+      const l = todayList([H('a'), H('b')], idxOf([['a', THU]]), THU);
+      eq(l.map((i) => i.habit.id), ['b', 'a']);
+    });
+    test('Etiqueta da frequência', () => {
+      eq(frequencyLabel(H('a')), 'Todos os dias'); eq(frequencyLabel(H('a', { tipo: 'dias', dias: [2, 4] })), 'Ter · Qui');
+      eq(frequencyLabel(H('a', { tipo: 'xPorSemana', n: 3 })), '3× por semana');
+    });
 
-    test('Hábito diário aparece todos os dias', () => eq(ids(buildDay([H('d', { tipo: 'diario' })], [], THU).habits), ['d']));
-    test('Hábito em dias específicos', () => {
-      const t = H('x', { tipo: 'dias', dias: [1, 3, 5] });
-      ok(isHabitScheduled(t, '2026-11-02')); ok(!isHabitScheduled(t, THU)); ok(isHabitScheduled(t, '2026-11-06'));
+    // ---------- Sequências ----------
+    group('Sequências (streaks)');
+    test('Sem marcações = 0 dias', () => eq(streak(H('a'), new Set(), THU), { value: 0, unit: 'dias' }));
+    test('5 dias seguidos até hoje', () => eq(streak(H('a'), idxOf(days('a', '2026-11-01', 5)), THU).value, 5));
+    test('Hoje por fazer não quebra a sequência', () => eq(streak(H('a'), idxOf(days('a', '2026-11-01', 4)), THU).value, 4));
+    test('Um dia falhado quebra a sequência', () => {
+      const idx = idxOf([...days('a', '2026-10-28', 3), ...days('a', '2026-11-02', 3)]); // falhou 31/10 e 1/11
+      eq(streak(H('a'), idx, '2026-11-04').value, 3);
     });
-    test('Hábito não aparece antes de ter sido criado', () => eq(buildDay([H('d', { tipo: 'diario' }, { criadaEm: '2026-11-06' })], [], THU).total, 0));
-    test('X por semana: aparece até atingir a meta', () => {
-      const t = H('g', { tipo: 'xPorSemana', n: 2 });
-      eq(buildDay([t], [C('g', '2026-11-02')], THU).habits[0].week, { count: 1, n: 2 });
-      eq(buildDay([t], [C('g', '2026-11-02'), C('g', '2026-11-03')], THU).total, 0);
+    test('Ontem falhado e hoje por fazer = 0', () => eq(streak(H('a'), idxOf([['a', '2026-11-03']]), THU).value, 0));
+    test('Singular: 1 dia', () => eq(streak(H('a'), idxOf([['a', THU]]), THU), { value: 1, unit: 'dia' }));
+    test('Dias específicos: dias não agendados não quebram', () => {
+      const h = H('m', { tipo: 'dias', dias: [1, 3, 5] }); // seg, qua, sex
+      const idx = idxOf([['m', '2026-10-26'], ['m', '2026-10-28'], ['m', '2026-10-30'], ['m', '2026-11-02'], ['m', '2026-11-04']]);
+      eq(streak(h, idx, THU).value, 5); // quinta não está agendada
     });
-    test('X por semana: concluído hoje continua visível como feito', () => {
-      const d = buildDay([H('g', { tipo: 'xPorSemana', n: 2 })], [C('g', '2026-11-02'), C('g', THU)], THU);
-      eq(d.habits.length, 1); ok(d.habits[0].done);
+    test('Não conta para trás da data de criação', () => eq(streak(H('a', undefined, { criadaEm: '2026-11-04' }), idxOf(days('a', '2026-11-01', 5)), THU).value, 2));
+    test('X por semana: semanas seguidas com a meta cumprida', () => {
+      const h = H('g', { tipo: 'xPorSemana', n: 2 });
+      const idx = idxOf([['g', '2026-10-19'], ['g', '2026-10-20'], ['g', '2026-10-26'], ['g', '2026-10-27']]);
+      eq(streak(h, idx, THU), { value: 2, unit: 'semanas' }); // semana atual ainda em curso não quebra
+      eq(streak(h, idxOf([['g', '2026-10-26'], ['g', '2026-10-27'], ['g', '2026-11-02'], ['g', '2026-11-03']]), THU).value, 2);
     });
-    test('X por semana: recomeça na segunda-feira', () => {
-      const log = [C('g', '2026-11-02'), C('g', '2026-11-03')];
-      eq(weekCount(log, 'g', '2026-11-08'), 2); eq(weekCount(log, 'g', '2026-11-09'), 0);
+    test('Melhor sequência de sempre', () => {
+      const idx = idxOf([...days('a', '2026-10-01', 10), ...days('a', '2026-10-20', 3)]);
+      eq(bestStreak(H('a'), idx, THU), 10);
     });
-    test('Missão de hoje aparece; a de amanhã vai para "Próximos"', () => {
-      const d = buildDay([M('a', THU), M('b', '2026-11-06'), M('c', '2026-11-30')], [], THU);
-      eq(ids(d.missions), ['a']); eq(ids(d.upcoming), ['b']);
+    test('Últimos 7 dias: feito / falhado / por fazer / não agendado', () => {
+      const h = H('m', { tipo: 'dias', dias: [1, 2, 3, 4, 5] });
+      const l = last7(h, idxOf([['m', '2026-11-02'], ['m', '2026-11-03']]), THU);
+      eq(l.map((d) => d.state), ['miss', 'off', 'off', 'done', 'done', 'miss', 'pending']);
     });
-    test('Missão atrasada por fazer aparece como atrasada', () => {
-      const d = buildDay([M('a', '2026-11-03')], [], THU);
-      ok(d.missions[0].overdue);
+    test('Taxa de 30 dias (hoje por fazer não conta)', () => {
+      const h = H('a', undefined, { criadaEm: '2026-11-01' });
+      eq(rate(h, idxOf([['a', '2026-11-01'], ['a', '2026-11-02'], ['a', '2026-11-04']]), THU), 0.75);
+      eq(rate(H('a', undefined, { criadaEm: THU }), new Set(), THU), null);
     });
-    test('Missão concluída só aparece no dia em que foi concluída', () => {
-      const tasks = [M('a', '2026-11-03')];
-      const log = [C('a', '2026-11-04')];
-      eq(buildDay(tasks, log, '2026-11-04').missions.length, 1);
-      eq(buildDay(tasks, log, THU).missions.length, 0);
-    });
-    test('Conclusões: contagem do dia e ordenação (por fazer primeiro)', () => {
-      const d = buildDay([H('a', { tipo: 'diario' }), H('b', { tipo: 'diario' })], [C('a', THU)], THU);
-      eq(d.done, 1); eq(d.total, 2); eq(ids(d.habits), ['b', 'a']); ok(isDoneOn([C('a', THU)], 'a', THU));
-    });
-    test('Missões arquivadas não aparecem', () => eq(buildDay([{ ...M('a', THU), arquivada: true }], [], THU).total, 0));
 
-    group('Streaks');
-    test('Streaks e escudo: chegam na Fase 3 (testes nessa fase)', () => {});
+    // ---------- Frases ----------
+    group('Frases e diário');
+    test('A frase do dia é estável (não muda a cada toque)', () => eq(trigger(THU, { hour: 10, slot: 'x' }), trigger(THU, { hour: 10, slot: 'x' })));
+    test('Frase de manhã vem das gerais ou das de manhã', () => {
+      const t = trigger(THU, { hour: 8, slot: 'hoje' }); ok([...TRIGGERS.geral, ...TRIGGERS.manha].includes(t));
+    });
+    test('As tuas frases entram na mistura', () => {
+      let found = false;
+      for (let i = 0; i < 400 && !found; i++) found = trigger(addDays(THU, i), { hour: 15, custom: ['frase minha'] }) === 'frase minha';
+      ok(found, 'a frase personalizada nunca apareceu');
+    });
+    test('Pergunta do diário é estável por dia', () => { eq(journalPrompt(THU), journalPrompt(THU)); ok(JOURNAL_PROMPTS.includes(journalPrompt(THU))); });
+    test('Frases variam ao longo dos dias', () => ok(new Set(Array.from({ length: 30 }, (_, i) => trigger(addDays(THU, i), { hour: 15 }))).size > 10));
+    test('Hash determinístico', () => eq(hash('abc'), hash('abc')));
+
+    // ---------- Migração ----------
+    group('Migração da versão 1');
+    test('Hábitos criados por ti passam; exemplos e missões não', () => {
+      const tasks = [
+        { id: 'h1', titulo: 'Ler', tipo: 'habito', recorrencia: { tipo: 'diario' }, criadaEm: '2026-11-01' },
+        { id: 'h2', titulo: 'Ex', tipo: 'habito', seed: true },
+        { id: 'm1', titulo: 'CV', tipo: 'pontual', data: THU },
+      ];
+      const log = [
+        { tipo: 'concluir', taskId: 'h1', data: '2026-11-02', ts: 1 },
+        { tipo: 'concluir', taskId: 'h1', data: '2026-11-02', ts: 2 }, // duplicado
+        { tipo: 'concluir', taskId: 'h2', data: '2026-11-02', ts: 3 },
+        { tipo: 'concluir', taskId: 'm1', data: THU, ts: 4 },
+      ];
+      const r = migrateV1(tasks, log);
+      eq(r.habits.map((h) => [h.id, h.nome]), [['h1', 'Ler']]);
+      eq(r.checks.map((c) => c.id), [checkId('h1', '2026-11-02')]);
+    });
 
     // ---------- Correr ----------
     let pass = 0, fail = 0;

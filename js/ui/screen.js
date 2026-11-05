@@ -10,6 +10,7 @@ export function createScreen(section, { title, trailing = '' }) {
     </header>
     <div class="scroller">
       <div class="large-title">
+        <div class="caps" hidden></div>
         <h1>${esc(title)}</h1>
         <p class="subtitle"></p>
       </div>
@@ -20,6 +21,8 @@ export function createScreen(section, { title, trailing = '' }) {
   const scroller = section.querySelector('.scroller');
   const large = section.querySelector('.large-title');
   const subtitle = section.querySelector('.subtitle');
+  const caps = section.querySelector('.caps');
+  const h1 = section.querySelector('.large-title h1');
 
   let ticking = false;
   scroller.addEventListener(
@@ -49,6 +52,14 @@ export function createScreen(section, { title, trailing = '' }) {
     scroller,
     content: section.querySelector('.content'),
     navbar,
+    setCaps(text) {
+      caps.textContent = text || '';
+      caps.hidden = !text;
+    },
+    /** Título grande com HTML próprio (ex.: estrela vermelha). */
+    setTitleHTML(html) {
+      h1.innerHTML = html;
+    },
     setSubtitle(text) {
       subtitle.textContent = text || '';
       subtitle.hidden = !text;

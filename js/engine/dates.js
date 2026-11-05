@@ -58,3 +58,25 @@ export function formatRelative(key, today = todayKey()) {
   if (diff === -1) return 'Ontem';
   return cap(fmtShort.format(fromKey(key)).replace(/\./g, ''));
 }
+
+const fmtMonth = new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' });
+const fmtCaps = new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+
+/** "novembro de 2026" → "Novembro 2026" */
+export const monthLabel = (key) => cap(fmtMonth.format(fromKey(key)).replace(' de ', ' '));
+
+/** "quinta · 5 de novembro" (para etiquetas em maiúsculas) */
+export function capsDate(key) {
+  const [wd, ...rest] = fmtCaps.format(fromKey(key)).split(', ');
+  return `${wd.replace('-feira', '')} · ${rest.join(', ')}`;
+}
+
+export const WEEKDAY_SHORT = ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+export const WEEKDAY_LETTER = ['', 'S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+
+export function greeting(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 6 && h < 13) return 'Bom dia';
+  if (h >= 13 && h < 20) return 'Boa tarde';
+  return 'Boa noite';
+}
