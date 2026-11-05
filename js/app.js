@@ -5,15 +5,16 @@ import { initKeyboardHandling } from './ui/sheet.js';
 import { closeOpenRow } from './ui/swipe.js';
 import { ICONS, esc, appRoot } from './ui/dom.js';
 import { createToday } from './screens/today.js';
-import { createHabits } from './screens/habits.js';
 import { createJournal } from './screens/journal.js';
-import { createPlaceholder } from './screens/placeholder.js';
+import { createAgenda } from './screens/agenda.js';
+import { createGoals } from './screens/goals.js';
+import { createFinance } from './screens/finance.js';
 
 const TABS = [
   { id: 'today', label: 'Hoje' },
   { id: 'agenda', label: 'Agenda' },
   { id: 'goals', label: 'Metas' },
-  { id: 'habits', label: 'Hábitos' },
+  { id: 'finance', label: 'Finanças' },
   { id: 'journal', label: 'Diário' },
 ];
 
@@ -35,9 +36,9 @@ function buildShell() {
 
   const $ = (id) => document.getElementById(`screen-${id}`);
   screens.today = createToday($('today'));
-  screens.agenda = createPlaceholder($('agenda'), { title: 'Agenda', caps: 'Fase B', text: 'Eventos com hora, vista de dia, semana e mês. O teu dia num relance.' });
-  screens.goals = createPlaceholder($('goals'), { title: 'Metas', caps: 'Fase B', text: 'Metas do mês, divididas em metas da semana. Progresso à mão ou automático a partir dos hábitos.' });
-  screens.habits = createHabits($('habits'));
+  screens.agenda = createAgenda($('agenda'));
+  screens.goals = createGoals($('goals'));
+  screens.finance = createFinance($('finance'));
   screens.journal = createJournal($('journal'));
 }
 
@@ -109,6 +110,7 @@ async function start() {
   }
   subscribe(() => screens[current].render());
   window.addEventListener('prefs-changed', renderAll);
+  window.addEventListener('goto-tab', (e) => show(e.detail));
   renderAll();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {

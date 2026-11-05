@@ -6,6 +6,7 @@ const DEFAULTS = {
   som: false,
   mostrarFrases: true,
   frases: [], // frases tuas, misturadas com as da app
+  orcamento: 60000, // orçamento mensal de despesas, em cêntimos (0 = sem orçamento)
   ultimoBackup: null, // ISO string
   bannerInstalarFechado: false,
 };

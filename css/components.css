@@ -758,8 +758,9 @@
 .sec {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  padding: 26px 32px 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 16px 20px 2px 32px;
 }
 .muted.small,
 .small {

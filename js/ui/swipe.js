@@ -47,7 +47,7 @@ export function attachSwipe(row, { onRight, onEdit, onDelete }) {
     }
     let x = base + mx;
     if (x < -ACTIONS_W) x = -ACTIONS_W + (x + ACTIONS_W) * 0.3; // resistência
-    if (x > 0) x = Math.min(x, width * 0.85);
+    if (x > 0) x = onRight ? Math.min(x, width * 0.85) : 0;
     dx = x;
     setX(x, false);
     row.classList.toggle('armed', x > width * 0.3);

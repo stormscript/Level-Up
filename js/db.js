@@ -2,15 +2,16 @@
 import { migrateV1 } from './engine/habits.js';
 
 const DB_NAME = 'levelup';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
-// Stores atuais (events e goals já preparadas para a Fase B).
+// Stores atuais.
 export const STORES = {
   habits: 'id',
   checks: 'id', // id = "habitId|AAAA-MM-DD"
   journal: 'id', // id = data "AAAA-MM-DD" (uma entrada por dia)
   events: 'id',
   goals: 'id',
+  transactions: 'id',
   meta: 'id',
 };
 

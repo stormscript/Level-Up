@@ -13,6 +13,18 @@ import { shouldShowInstallBanner } from '../ui/install.js';
 import { openHabitForm, confirmDeleteHabit } from './habitForm.js';
 import { openJournal, moodBars } from './journalForm.js';
 import { openSettings } from './settings.js';
+import { agendaListHTML } from './agenda.js';
+import { openEventForm } from './eventForm.js';
+import { goalCardHTML } from './goals.js';
+import { openGoalForm } from './goalForm.js';
+import { openGoalSheet } from './goalSheet.js';
+import { openTxForm } from './txForm.js';
+import { goalCtx } from '../state.js';
+import { featuredWeekly } from '../engine/goals.js';
+import { spentOn, monthSummary, fmtEUR } from '../engine/money.js';
+import { actionSheet } from '../ui/sheet.js';
+
+const goTab = (tab) => window.dispatchEvent(new CustomEvent('goto-tab', { detail: tab }));
 
 const MILESTONES = [7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
 
@@ -43,7 +55,7 @@ export function createToday(section) {
     title: 'Hoje',
     trailing: `<button class="icon-btn" type="button" data-action="settings" aria-label="Definições">${ICONS.gear}</button>`,
   });
-  section.insertAdjacentHTML('beforeend', `<button class="fab" type="button" data-action="new" aria-label="Novo hábito">${ICONS.plus}</button>`);
+  section.insertAdjacentHTML('beforeend', `<button class="fab" type="button" data-action="new" aria-label="Adicionar">${ICONS.plus}</button>`);
 
   let holdUntil = 0;
   let pending = null;
@@ -51,8 +63,13 @@ export function createToday(section) {
   section.addEventListener('click', (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (action === 'settings') return openSettings();
-    if (action === 'new') return openHabitForm();
+    if (action === 'new') return quickAdd();
     if (action === 'journal') return openJournal();
+    if (action === 'goto') return goTab(e.target.closest('[data-action]').dataset.tab);
+    const goal = e.target.closest('[data-goal]');
+    if (goal) return openGoalSheet(goal.dataset.goal);
+    const ev = e.target.closest('[data-ev]');
+    if (ev) return openEventForm(state.events.find((x) => x.id === ev.dataset.ev), { date: ev.dataset.date });
     if (action === 'dismiss-install') {
       setPref('bannerInstalarFechado', true);
       return render();
@@ -65,6 +82,22 @@ export function createToday(section) {
       if (h) openHabitForm(h);
     }
   });
+
+  async function quickAdd() {
+    const choice = await actionSheet({
+      title: 'Adicionar',
+      actions: [
+        { label: 'Gasto', value: 'tx' },
+        { label: 'Evento na agenda', value: 'ev' },
+        { label: 'Hábito', value: 'habit' },
+        { label: 'Meta', value: 'goal' },
+      ],
+    });
+    if (choice === 'tx') openTxForm();
+    if (choice === 'ev') openEventForm();
+    if (choice === 'habit') openHabitForm();
+    if (choice === 'goal') openGoalForm(null, { tipo: 'semana' });
+  }
 
   async function toggle(row) {
     const today = todayKey();
@@ -106,6 +139,10 @@ export function createToday(section) {
     const pct = list.length ? Math.round((doneN / list.length) * 100) : 0;
     const closed = list.length > 0 && doneN === list.length;
     const j = journalOn(today);
+    const weekGoal = featuredWeekly(state.goals, today, goalCtx());
+    const agenda = agendaListHTML(today, { limit: 4 });
+    const spentToday = spentOn(state.txs, today);
+    const month = monthSummary(state.txs, today.slice(0, 7));
 
     const installBanner = shouldShowInstallBanner(prefs.bannerInstalarFechado)
       ? `<div class="banner">
@@ -127,10 +164,22 @@ export function createToday(section) {
         </div>
       </div>
 
+      ${weekGoal ? `<div class="sec"><span class="caps">Meta da semana</span><button type="button" class="sec-link" data-action="goto" data-tab="goals">Todas</button></div>${goalCardHTML(weekGoal, { compact: true })}` : ''}
+
+      <div class="sec"><span class="caps">Agenda</span><button type="button" class="sec-link" data-action="goto" data-tab="agenda">Ver tudo</button></div>
+      ${agenda ? `<div class="group ev-list">${agenda}</div>` : `<div class="empty small"><p>Nada marcado para hoje.</p></div>`}
+
       <div class="sec"><span class="caps">Hábitos</span></div>
       ${list.length
         ? `<div class="group list">${list.map((i) => habitRow(i, today)).join('')}</div>`
-        : `<div class="empty small"><p>Nenhum hábito para hoje.<br>Toca em <b>+</b> para criar.</p></div>`}
+        : `<div class="empty small"><p>Nenhum hábito para hoje.</p></div>`}
+
+      <div class="sec"><span class="caps">Dinheiro</span><button type="button" class="sec-link" data-action="goto" data-tab="finance">Finanças</button></div>
+      <button type="button" class="card money-card" data-action="goto" data-tab="finance">
+        <div><span class="caps small">Hoje</span><b>${esc(fmtEUR(spentToday))}</b></div>
+        <div><span class="caps small">Este mês</span><b>${esc(fmtEUR(month.despesas, { round: true }))}${prefs.orcamento ? `<small> / ${esc(fmtEUR(prefs.orcamento, { round: true }))}</small>` : ''}</b></div>
+        ${prefs.orcamento ? `<div class="bar thin ${month.despesas > prefs.orcamento ? 'over' : ''}"><i style="width:${Math.min(100, (month.despesas / prefs.orcamento) * 100).toFixed(1)}%"></i></div>` : ''}
+      </button>
 
       <div class="sec"><span class="caps">Diário</span></div>
       <button type="button" class="card journal-card" data-action="journal">
@@ -140,11 +189,6 @@ export function createToday(section) {
           : `<div class="jc-top"><span class="jc-icon">${ICONS.pen}</span><span class="muted small">Ainda em branco</span></div>
              <p class="jc-prompt">${esc(journalPrompt(today))}</p>`}
       </button>
-
-      <div class="card soon">
-        <span class="soon-icon">${ICONS.agenda}</span>
-        <div><strong>Agenda e metas</strong><span class="muted small">A chegar na Fase B: o teu dia e a meta da semana aqui.</span></div>
-      </div>
 
       ${whisper('hoje-fim')}`;
 

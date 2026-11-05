@@ -63,5 +63,65 @@ export function buildSample(today) {
     },
   ];
 
-  return { habits, checks, journal };
+  return { habits, checks, journal, ...buildSampleExtras(today, habits) };
+}
+
+/** Exemplos da Fase B: agenda, metas e finanças. */
+export function buildSampleExtras(today, habits = []) {
+  const d = (n) => addDays(today, n);
+  const month = today.slice(0, 7);
+  const monday = addDays(today, 1 - weekdayOf(today));
+  const gym = habits.find((h) => h.nome === 'Ginásio');
+
+  const ev = (titulo, data, inicio, fim, extra = {}) => ({ id: uid(), titulo, data, inicio, fim, repetir: 'nunca', seed: true, ...extra });
+  const events = [
+    ev('Aula · Marketing Digital', addDays(monday, 0), '10:00', '11:30', { local: 'Sala 2.14', repetir: 'semanal' }),
+    ev('Aula · Finanças Empresariais', addDays(monday, 2), '14:00', '15:30', { local: 'Anfiteatro B', repetir: 'semanal' }),
+    ev('Ginásio — Push day', d(0), '18:30', '19:45'),
+    ev('Almoço com a Inês', d(0), '13:00', '14:00', { local: 'Time Out Market' }),
+    ev('Jantar de aniversário do Rui', d(1), '21:00', '23:30', { local: 'Bairro Alto' }),
+    ev('Entrega do trabalho de grupo', d(3), '', '', {}),
+    ev('Corte de cabelo', d(2), '17:00', '17:45'),
+  ];
+
+  let ordem = 0;
+  const goal = (g) => ({ id: uid(), ordem: ordem++, registos: [], seed: true, medida: 'numero', modo: 'manual', unidade: '', ...g });
+  const save = goal({ tipo: 'mes', periodo: month, titulo: 'Poupar 300 €', alvo: 300, unidade: '€', modo: 'poupanca' });
+  const books = goal({ tipo: 'mes', periodo: month, titulo: 'Ler 2 livros', alvo: 2, unidade: 'livros', registos: [{ id: uid(), data: d(-3), valor: 1 }] });
+  const train = goal({ tipo: 'mes', periodo: month, titulo: 'Treinar 16 vezes', alvo: 16, unidade: 'treinos', modo: gym ? 'habito' : 'manual', habitId: gym?.id });
+  const goals = [
+    save, books, train,
+    goal({ tipo: 'mes', periodo: month, titulo: 'Tirar a carta de condução', medida: 'feito', feito: false }),
+    goal({ tipo: 'semana', periodo: monday, titulo: 'Treinar 4x', alvo: 4, unidade: 'treinos', modo: gym ? 'habito' : 'manual', habitId: gym?.id, paiId: train.id }),
+    goal({ tipo: 'semana', periodo: monday, titulo: 'Ler 100 páginas', alvo: 100, unidade: 'páginas', paiId: books.id, registos: [{ id: uid(), data: d(-1), valor: 40 }, { id: uid(), data: d(0), valor: 22 }] }),
+    goal({ tipo: 'semana', periodo: monday, titulo: 'Poupar 75 €', alvo: 75, unidade: '€', modo: 'poupanca', paiId: save.id }),
+    goal({ tipo: 'semana', periodo: monday, titulo: 'Acabar o trabalho de grupo', medida: 'feito', feito: false }),
+  ];
+
+  const tx = (tipo, valor, categoria, daysAgo, nota = '') => {
+    const data = d(-daysAgo);
+    return data.slice(0, 7) === month || daysAgo === 0
+      ? { id: uid(), tipo, valor, categoria, data, nota, ts: Date.now() - daysAgo * 86400000, seed: true }
+      : null;
+  };
+  const transactions = [
+    tx('receita', 45000, 'mesada', Number(today.slice(8)) - 1, 'Mesada'),
+    tx('receita', 12000, 'extra', 6, 'Explicações'),
+    tx('despesa', 4280, 'super', 6, 'Continente'),
+    tx('despesa', 1250, 'comida', 5, 'Almoço na faculdade'),
+    tx('despesa', 2200, 'saidas', 4, 'Sexta à noite'),
+    tx('despesa', 3000, 'ginasio', Number(today.slice(8)) - 1, 'Mensalidade ginásio'),
+    tx('despesa', 1199, 'subs', 3, 'Spotify + iCloud'),
+    tx('despesa', 4000, 'transporte', 3, 'Passe'),
+    tx('despesa', 890, 'comida', 2, 'Café + pastel'),
+    tx('despesa', 3499, 'compras', 1, 'T-shirt'),
+    tx('despesa', 1450, 'comida', 0, 'Almoço com a Inês'),
+  ].filter(Boolean);
+
+  return { events, goals, transactions };
+}
+
+function weekdayOf(key) {
+  const w = new Date(`${key}T12:00:00`).getDay();
+  return w === 0 ? 7 : w;
 }

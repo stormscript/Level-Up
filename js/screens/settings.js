@@ -6,7 +6,7 @@ import { toast } from '../ui/effects.js';
 import { el, esc } from '../ui/dom.js';
 import { todayKey } from '../engine/dates.js';
 
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';
 
 export function openSettings() {
   const body = el(`<div class="form"></div>`);
