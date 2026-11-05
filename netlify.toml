@@ -1,0 +1,16 @@
+# Configuração do Netlify: site estático, sem passo de build.
+[build]
+  publish = "."
+  command = ""
+
+# O service worker nunca pode ficar em cache: é ele que traz as versões novas.
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
