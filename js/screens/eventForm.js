@@ -49,8 +49,14 @@ export function openEventForm(existing = null, { date = todayKey() } = {}) {
           <button type="button" data-v="diario">Diário</button>
           <button type="button" data-v="semanal">Semanal</button>
           <button type="button" data-v="mensal">Mensal</button>
+          <button type="button" data-v="anual">Anual</button>
         </div>
       </div>
+
+      <div class="group" style="margin-top:14px">
+        <label class="cell"><span class="cell-label">Contagem decrescente no Hoje</span><input type="checkbox" class="switch" name="contagem" ${existing?.contagem ? 'checked' : ''}></label>
+      </div>
+      <p class="group-footer">Ex.: "Exame · faltam 12 dias". Ideal para exames, viagens e aniversários.</p>
 
       <div class="group-header">Notas</div>
       <div class="group"><textarea name="notas" class="notes" rows="3" placeholder="Opcional">${esc(f.notas)}</textarea></div>
@@ -100,6 +106,7 @@ export function openEventForm(existing = null, { date = todayKey() } = {}) {
       fim: f.diaTodo ? '' : form.elements.fim.value || '',
       repetir: f.repetir,
       notas: form.elements.notas.value.trim(),
+      contagem: form.elements.contagem.checked,
     };
     delete ev.seed;
     await saveEvent(ev);

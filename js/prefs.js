@@ -7,6 +7,9 @@ const DEFAULTS = {
   mostrarFrases: true,
   frases: [], // frases tuas, misturadas com as da app
   orcamento: 60000, // orçamento mensal de despesas, em cêntimos (0 = sem orçamento)
+  avisos: true, // avisos no topo do Hoje ao abrir a app
+  avisosFechados: {}, // { idDoAviso: 'AAAA-MM-DD' } fechado nesse dia
+  planeadoPara: null, // data do último "Planear amanhã"
   ultimoBackup: null, // ISO string
   bannerInstalarFechado: false,
 };

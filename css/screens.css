@@ -895,3 +895,174 @@ textarea.notes {
 .cat span { font-size: 22px; }
 .cat:active { transform: scale(0.95); }
 .cat.sel { border-color: var(--accent); background: var(--accent-soft); color: #fff; }
+
+/* ---------- Fase C: tarefas, escrita rápida, avisos, contagens, planear ---------- */
+.check.square .ring { border-radius: 8px; }
+.todo-row .check { width: 52px; }
+.todo-row.prio .task-title { font-weight: 600; }
+.star-mini { color: var(--accent); margin-right: 6px; text-shadow: 0 0 8px rgba(255, 42, 61, 0.6); }
+.todo-row .late { color: var(--accent); }
+.todo-row.done .task-title { text-decoration: line-through; text-decoration-color: var(--label3); }
+.sa-move { background: #48484a; }
+
+.quick-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 10px;
+  padding: 0 6px 0 14px;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-elev);
+  flex-wrap: wrap;
+}
+.sheet .quick-add { background: var(--sheet-cell); }
+.quick-add:focus-within { border-color: rgba(255, 42, 61, 0.45); }
+.qa-plus { color: var(--accent); font-size: 22px; font-weight: 300; line-height: 1; }
+.quick-add input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.qa-go {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+.quick-add.typing .qa-go { opacity: 1; transform: none; pointer-events: auto; }
+.qa-hint { flex-basis: 100%; font-size: 12px; color: var(--accent); padding: 0 0 8px 26px; margin-top: -6px; }
+.qa-hint:empty { display: none; }
+
+.sub-sec {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 20px 4px 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.sub-sec .sec-link { min-height: 36px; }
+
+.nudge {
+  display: flex;
+  align-items: center;
+  margin: 10px 16px 0;
+  padding-left: 14px;
+  border: 1px solid rgba(255, 42, 61, 0.28);
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(255, 42, 61, 0.12), rgba(255, 42, 61, 0.03));
+}
+.nudge-main {
+  flex: 1;
+  min-height: 48px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nudge-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex: none; }
+.nudge .icon-btn { color: var(--label2); }
+
+.countdowns {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0 16px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.countdowns::-webkit-scrollbar { display: none; }
+.cd {
+  flex: none;
+  width: 116px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg-elev);
+  text-align: left;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+.cd b { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: var(--accent); text-shadow: 0 0 12px rgba(255, 42, 61, 0.35); }
+.cd span { font-size: 12px; color: var(--label2); }
+.cd em { flex-basis: 100%; font-style: normal; font-size: 13px; line-height: 1.25; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.plan-card { display: flex; align-items: center; gap: 14px; color: inherit; font: inherit; border-color: rgba(255, 42, 61, 0.3); }
+.plan-card > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.plan-star { font-size: 24px; color: var(--accent); text-shadow: var(--accent-glow); }
+.chev { color: var(--label3); display: grid; }
+.chev svg { width: 16px; height: 16px; }
+.link-btn.inline { padding: 0; min-height: 0; font-size: 13px; }
+
+.planner-lead { margin: 10px 20px 4px; font-size: 17px; line-height: 1.4; text-align: center; color: rgba(255, 255, 255, 0.85); }
+.caps.center { text-align: center; display: block; }
+.pick { color: inherit; min-height: 52px; }
+.pick-star { color: #3a3a3c; font-size: 18px; transition: color 0.15s, text-shadow 0.15s; }
+.pick.on .pick-star { color: var(--accent); text-shadow: var(--accent-glow); }
+.pick.on .cell-label { font-weight: 600; }
+
+.inbox-btn { position: relative; }
+.badge {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+/* pontos: eventos (vermelho) e tarefas (branco) */
+.week-strip .day em, .mg-day em { display: flex; gap: 3px; height: 4px; }
+.week-strip .day em i, .mg-day em i { width: 4px; height: 4px; border-radius: 2px; display: block; }
+.week-strip .day em i.on, .mg-day em i.on { background: var(--accent); }
+.week-strip .day em i.td, .mg-day em i.td { background: rgba(255, 255, 255, 0.7); }
+.week-strip .day.sel em i, .mg-day.sel em i { background: #fff; }
+.legend { margin-left: 6px; white-space: nowrap; }
+.legend i { display: inline-block; width: 6px; height: 6px; border-radius: 3px; margin: 0 3px 1px 6px; }
+.legend i.on { background: var(--accent); }
+.legend i.td { background: rgba(255, 255, 255, 0.7); }
+
+/* passos dentro do formulário de tarefa */
+.step { min-height: 46px; }
+.step-check {
+  width: 24px; height: 24px; flex: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.3); border-radius: 7px;
+  background: none; color: #fff; font-size: 13px; padding: 0;
+}
+.step.done .step-check { background: var(--accent); border-color: var(--accent); }
+.step.done .cell-label { color: var(--label2); text-decoration: line-through; }
+.add-step { margin: 8px 16px 0; }
+.add-step input {
+  width: 100%; height: 46px; padding: 0 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 14px;
+  background: transparent; outline: none;
+}
+.segmented[data-field='repetir'] button { font-size: 13px; }

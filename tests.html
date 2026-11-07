@@ -26,6 +26,10 @@
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
     import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth } from './js/engine/money.js';
     import { periodRange, progress, shiftPeriod, currentPeriod, goalsFor, featuredWeekly, weekLabel } from './js/engine/goals.js';
+    import { todosOn, overdue, inbox, nextDate, prioritiesOn, stepsLabel } from './js/engine/todos.js';
+    import { parseQuick } from './js/engine/parse.js';
+    import { nextOccurrence, countdowns } from './js/engine/agenda.js';
+    import { nudges } from './js/engine/nudges.js';
     import { trigger, journalPrompt, closingLine, hash, TRIGGERS, JOURNAL_PROMPTS } from './js/engine/phrases.js';
 
     const groups = [];
@@ -230,6 +234,75 @@
       const b = G({ id: 'b', tipo: 'semana', periodo: '2026-11-02', alvo: 5, ordem: 1 });
       eq(featuredWeekly([a, b], THU, {}).id, 'b'); eq(featuredWeekly([], THU, {}), null);
       eq(goalsFor([a, b, G({ id: 'c', tipo: 'mes', periodo: '2026-11' })], 'semana', '2026-11-02').length, 2);
+    });
+
+    // ---------- Tarefas ----------
+    group('Tarefas');
+    const TD = (id, data, extra = {}) => ({ id, titulo: id, data, hora: '', prioridade: false, feito: false, ordem: 0, ...extra });
+    test('Tarefas do dia: importantes primeiro, depois por hora, feitas no fim', () => {
+      const l = todosOn([TD('a', THU, { hora: '15:00' }), TD('b', THU, { feito: true }), TD('c', THU, { prioridade: true }), TD('d', THU, { hora: '09:00' })], THU, THU);
+      eq(l.map((x) => x.todo.id), ['c', 'd', 'a', 'b']);
+    });
+    test('Atrasadas aparecem hoje (e só hoje), antes das feitas', () => {
+      const todos = [TD('velha', '2026-11-03'), TD('hoje', THU), TD('feita', THU, { feito: true }), TD('velhaFeita', '2026-11-02', { feito: true })];
+      const l = todosOn(todos, THU, THU);
+      eq(l.map((x) => [x.todo.id, x.atrasada]), [['hoje', false], ['velha', true], ['feita', false]]);
+      eq(todosOn(todos, '2026-11-06', THU).length, 0);
+      eq(overdue(todos, THU).map((t) => t.id), ['velha']);
+    });
+    test('Sem data: só as por fazer', () => eq(inbox([TD('a', null), TD('b', null, { feito: true }), TD('c', THU)]).map((t) => t.id), ['a']));
+    test('Repetição: próxima data', () => {
+      eq(nextDate(THU, 'diario'), '2026-11-06'); eq(nextDate(THU, 'semanal'), '2026-11-12');
+      eq(nextDate('2026-01-31', 'mensal'), '2026-02-28'); eq(nextDate('2026-12-15', 'mensal'), '2027-01-15'); eq(nextDate(THU, 'nunca'), null);
+    });
+    test('Prioridades do dia e passos', () => {
+      eq(prioritiesOn([TD('a', THU, { prioridade: true }), TD('b', THU)], THU).map((t) => t.id), ['a']);
+      eq(stepsLabel({ passos: [{ feito: true }, { feito: false }, { feito: false }] }), '1/3'); eq(stepsLabel({}), '');
+    });
+
+    group('Escrita rápida');
+    const P = (txt, base = THU) => { const r = parseQuick(txt, THU, base); return [r.titulo, r.data, r.hora, r.prioridade]; };
+    test('"amanhã 15h ligar ao banco"', () => eq(P('amanhã 15h ligar ao banco'), ['Ligar ao banco', '2026-11-06', '15:00', false]));
+    test('"ligar ao banco amanha às 9h30" (sem acento, hora no fim)', () => eq(P('ligar ao banco amanha às 9h30'), ['Ligar ao banco', '2026-11-06', '09:30', false]));
+    test('"! entregar trabalho sexta"', () => eq(P('! entregar trabalho sexta'), ['Entregar trabalho', '2026-11-06', '', true]));
+    test('Dia da semana: "segunda" = próxima segunda; "quinta" numa quinta = semana seguinte', () => {
+      eq(P('dentista na segunda')[1], '2026-11-09'); eq(P('reunião quinta')[1], '2026-11-12'); eq(P('festa no sábado')[1], '2026-11-07');
+    });
+    test('Datas: "12/11", "dia 20", "depois de amanhã", "hoje"', () => {
+      eq(P('pagar renda 12/11')[1], '2026-11-12'); eq(P('pagar renda 1/11')[1], '2027-11-01');
+      eq(P('consulta dia 20')[1], '2026-11-20'); eq(P('consulta dia 2')[1], '2026-12-02');
+      eq(P('ir ao banco depois de amanhã')[1], '2026-11-07'); eq(P('hoje lavar roupa', null)[1], THU);
+    });
+    test('Horas: "18:45", "às 9"', () => { eq(P('jantar 18:45')[2], '18:45'); eq(P('treino às 9')[2], '09:00'); });
+    test('Sem data por omissão (caixa) e hora puxa para hoje', () => {
+      eq(P('ver documentário', null), ['Ver documentário', null, '', false]);
+      eq(P('ligar 15h', null)[1], THU);
+    });
+    test('Texto normal não é confundido', () => eq(P('ler 20 páginas'), ['Ler 20 páginas', THU, '', false]));
+
+    group('Contagens e avisos');
+    test('Próxima ocorrência e contagens decrescentes', () => {
+      eq(nextOccurrence(E('a', '2026-11-20'), THU), '2026-11-20'); eq(nextOccurrence(E('a', '2026-11-01'), THU), null);
+      eq(nextOccurrence(E('b', '2001-03-15', '', '', { repetir: 'anual' }), THU), '2027-03-15');
+      const c = countdowns([E('x', '2026-11-17', '', '', { contagem: true }), E('y', THU, '', '', { contagem: true }), E('z', '2026-11-10')], THU);
+      eq(c.map((k) => [k.ev.id, k.dias]), [['y', 0], ['x', 12]]);
+    });
+    const N = (extra) => nudges({ today: THU, hour: 21, journalToday: true, plannedTomorrow: true, weekGoal: null, budgetPct: null,
+      lastBackup: '2026-11-04T10:00:00Z', hasData: true, overdueCount: 0, dismissed: {}, ...extra }, 9).map((n) => n.id);
+    test('Avisos: nada a dizer → nada', () => eq(N({}), []));
+    test('Avisos: atrasadas, planear, diário (à noite)', () => {
+      eq(N({ overdueCount: 2, plannedTomorrow: false, journalToday: false }), ['atrasadas', 'planear', 'diario']);
+      eq(N({ hour: 10, plannedTomorrow: false, journalToday: false }), []);
+    });
+    test('Avisos: meta só a partir de sexta; orçamento ≥ 80%; backup ≥ 7 dias', () => {
+      eq(N({ weekGoal: { titulo: 'x', falta: 1 } }), []);
+      eq(N({ today: '2026-11-06', weekGoal: { titulo: 'x', falta: 1 } }), ['meta']);
+      eq(N({ budgetPct: 0.85 }), ['orcamento']);
+      eq(N({ lastBackup: '2026-10-20T10:00:00Z' }), ['backup']); eq(N({ lastBackup: null }), ['backup']); eq(N({ lastBackup: null, hasData: false }), []);
+    });
+    test('Avisos fechados hoje não voltam; máximo 2', () => {
+      eq(N({ overdueCount: 1, dismissed: { atrasadas: THU } }), []);
+      eq(nudges({ today: THU, hour: 21, overdueCount: 1, plannedTomorrow: false, journalToday: false, hasData: false, dismissed: {} }).length, 2);
     });
 
     // ---------- Frases ----------

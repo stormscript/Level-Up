@@ -3,7 +3,7 @@
 Hábitos, metas, agenda e diário — em preto, branco e vermelho. ✦
 Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no teu telemóvel.
 
-**Versão 0.3.0 — Fase B**: Hoje · Agenda · Metas (mês, semana, hábitos) · Finanças · Diário.
+**Versão 0.4.0 — Fase C**: Hoje · Agenda (eventos + tarefas) · Metas (mês, semana, hábitos) · Finanças · Diário. Com planear amanhã, contagens decrescentes e avisos ao abrir.
 
 ---
 
@@ -49,7 +49,7 @@ Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no
 1. Substitui os ficheiros alterados no GitHub (**Add file → Upload files**, arrasta-os e faz **Commit**). Ficheiros com o mesmo nome são substituídos.
 2. **Importante:** abre o `service-worker.js` no GitHub (ícone do lápis ✏️) e muda o número da versão:
    ```js
-   const CACHE_VERSION = 'levelup-v0.3.0';   // → 'levelup-v0.3.1'
+   const CACHE_VERSION = 'levelup-v0.4.0';   // → 'levelup-v0.4.1'
    ```
    Sem este passo, o iPhone continua a mostrar a versão antiga (está guardada em cache para funcionar offline).
 3. Se criares um ficheiro novo, acrescenta-o à lista `ASSETS` nesse mesmo ficheiro.
@@ -78,17 +78,21 @@ Abre `https://O-TEU-UTILIZADOR.github.io/levelup/tests.html`. Deve aparecer **"T
 
 | Gesto | Ação |
 |---|---|
-| Tocar no círculo | Marcar / desmarcar o hábito |
-| Deslizar → | Marcar (ou desmarcar) |
-| Deslizar ← | Editar · Apagar |
-| Tocar no hábito | Editar e ver estatísticas |
-| Botão **+** | Novo hábito |
-| Cartão **Diário** | Escrever o dia (guarda sozinho) |
+| Tocar no círculo / quadrado | Marcar hábito / concluir tarefa |
+| Deslizar → | Marcar ou concluir (ou desfazer) |
+| Deslizar ← numa tarefa | **Amanhã** · Editar · Apagar |
+| Botão **+** no Hoje | Tarefa, gasto, evento, hábito ou meta |
 | Tocar no separador ativo | Voltar ao topo |
 | Arrastar um painel para baixo | Fechar |
 
-**Sequências:** dias seguidos a cumprir (hoje por fazer não quebra). Nos hábitos "X por semana", conta semanas seguidas.
-**Frases:** aparecem discretas ao longo da app e mudam com o dia. Acrescenta as tuas em ⚙️ → *As tuas frases*.
+**Escrita rápida de tarefas** — escreve e carrega em Enter:
+- `amanhã 15h ligar ao banco` → amanhã às 15:00
+- `! entregar trabalho sexta` → sexta, importante (✦)
+- `dentista dia 20 às 9h30` · `pagar renda 12/11` · `depois de amanhã ir ao banco`
+
+**Rotina sugerida:** de manhã abre o **Hoje**; ao longo do dia regista gastos no **+**; à noite **Planear amanhã** (as 3 que importam) e escreve no **Diário**.
+
+**Contagens decrescentes:** num evento liga "Contagem decrescente no Hoje" (exames, viagens, aniversários com repetição *Anual*).
 
 ## 📁 Estrutura
 

@@ -1,12 +1,13 @@
 // Estado da app em memória + gravação no IndexedDB.
 import * as db from './db.js';
 import { prefs, replacePrefs, setPref } from './prefs.js';
-import { buildSample, buildSampleExtras, uid } from './seed.js';
+import { buildSample, buildSampleExtras, buildSampleTodos, uid } from './seed.js';
 import { todayKey } from './engine/dates.js';
 import { checkId, makeIndex, migrateV1, streak } from './engine/habits.js';
+import { nextDate } from './engine/todos.js';
 
 export const state = {
-  habits: [], checks: [], journal: [], events: [], goals: [], txs: [],
+  habits: [], checks: [], journal: [], events: [], goals: [], txs: [], todos: [],
   idx: new Set(), ready: false,
 };
 
@@ -17,7 +18,7 @@ const emit = () => {
   listeners.forEach((fn) => fn(state));
 };
 
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 const META = () => ({ id: 'app', criadoEm: new Date().toISOString(), versaoDados: DATA_VERSION });
 
 /** Contexto para calcular o progresso das metas. */
@@ -34,15 +35,23 @@ export async function load() {
     await db.putMany('events', s.events);
     await db.putMany('goals', s.goals);
     await db.putMany('transactions', s.transactions);
+    await db.putMany('todos', s.todos);
     await db.put('meta', META());
   } else if ((meta.versaoDados || 1) < DATA_VERSION) {
-    // Vinhas da Fase A: se ainda tens os exemplos, junta exemplos de agenda, metas e finanças.
+    // Vens de uma versão anterior: se ainda tens os exemplos, junta os exemplos novos.
+    const ver = meta.versaoDados || 1;
     const habits = await db.getAll('habits');
     if (habits.some((h) => h.seed)) {
       const x = buildSampleExtras(todayKey(), habits);
-      await db.putMany('events', x.events);
-      await db.putMany('goals', x.goals);
-      await db.putMany('transactions', x.transactions);
+      if (ver < 3) {
+        await db.putMany('events', x.events);
+        await db.putMany('goals', x.goals);
+        await db.putMany('transactions', x.transactions);
+        await db.putMany('todos', x.todos);
+      } else {
+        await db.putMany('events', x.events.filter((e) => e.contagem));
+        await db.putMany('todos', buildSampleTodos(todayKey(), await db.getAll('goals')));
+      }
     }
     await db.put('meta', { ...meta, versaoDados: DATA_VERSION });
   }
@@ -51,9 +60,10 @@ export async function load() {
 }
 
 async function reload() {
-  const [habits, checks, journal, events, goals, txs] = await Promise.all(
-    ['habits', 'checks', 'journal', 'events', 'goals', 'transactions'].map((s) => db.getAll(s)),
+  const [habits, checks, journal, events, goals, txs, todos] = await Promise.all(
+    ['habits', 'checks', 'journal', 'events', 'goals', 'transactions', 'todos'].map((s) => db.getAll(s)),
   );
+  state.todos = todos;
   state.habits = habits.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
   state.checks = checks;
   state.journal = journal.sort((a, b) => (a.data < b.data ? 1 : -1));
@@ -183,16 +193,99 @@ export function saveTx(tx) {
 }
 export const deleteTx = (id) => removeFrom('transactions', 'txs', id);
 
+// ---------- Tarefas ----------
+
+export function saveTodo(todo) {
+  const t = stamp({ hora: '', prioridade: false, nota: '', passos: [], feito: false, repetir: 'nunca', ...todo });
+  delete t.criadoEm;
+  return upsert('todos', 'todos', t);
+}
+
+export async function deleteTodo(id) {
+  const t = state.todos.find((x) => x.id === id);
+  if (t?.goalEntryId) await unlinkGoalEntry(t);
+  await removeFrom('todos', 'todos', id);
+}
+
+async function unlinkGoalEntry(t) {
+  const g = state.goals.find((x) => x.id === t.goalId);
+  if (g) await removeGoalEntry(g, t.goalEntryId);
+}
+
+/**
+ * Concluir / desfazer uma tarefa.
+ * - Se se repete, cria a próxima ao concluir (e apaga-a se desfizeres).
+ * - Se está ligada a uma meta "à mão", soma +1 (e tira se desfizeres).
+ */
+export async function toggleTodo(id, today = todayKey()) {
+  const t = state.todos.find((x) => x.id === id);
+  if (!t) return null;
+  const next = { ...t };
+  delete next.seed;
+  if (!t.feito) {
+    next.feito = true;
+    next.feitoEm = today;
+    const nd = t.repetir && t.repetir !== 'nunca' ? nextDate(t.data, t.repetir) : null;
+    if (nd && !t.proximaId) {
+      const copy = await saveTodo({ ...t, id: null, data: nd, feito: false, feitoEm: null, proximaId: null, goalEntryId: null, seed: undefined,
+        passos: (t.passos || []).map((p) => ({ ...p, feito: false })) });
+      next.proximaId = copy.id;
+    }
+    const g = t.goalId && state.goals.find((x) => x.id === t.goalId);
+    if (g && g.medida !== 'feito' && (g.modo || 'manual') === 'manual') {
+      const entryId = uid();
+      await saveGoal({ ...g, registos: [...(g.registos || []), { id: entryId, data: today, valor: 1, tarefa: t.id }] });
+      next.goalEntryId = entryId;
+    }
+  } else {
+    next.feito = false;
+    next.feitoEm = null;
+    if (t.proximaId) {
+      const copy = state.todos.find((x) => x.id === t.proximaId);
+      if (copy && !copy.feito) await removeFrom('todos', 'todos', copy.id);
+      next.proximaId = null;
+    }
+    if (t.goalEntryId) {
+      await unlinkGoalEntry(t);
+      next.goalEntryId = null;
+    }
+  }
+  await upsert('todos', 'todos', next);
+  return { done: next.feito };
+}
+
+/** Muda a tarefa de dia (null = sem data). */
+export function moveTodo(id, data) {
+  const t = state.todos.find((x) => x.id === id);
+  return t ? upsert('todos', 'todos', { ...t, data }) : null;
+}
+
+export function toggleStep(id, stepId) {
+  const t = state.todos.find((x) => x.id === id);
+  if (!t) return null;
+  return upsert('todos', 'todos', { ...t, passos: (t.passos || []).map((p) => (p.id === stepId ? { ...p, feito: !p.feito } : p)) });
+}
+
+/** "Planear amanhã": marca até 3 tarefas como prioridade e guarda que já planeaste. */
+export async function setPriorities(date, ids) {
+  for (const t of state.todos.filter((x) => x.data === date)) {
+    const want = ids.includes(t.id);
+    if (!!t.prioridade !== want) await upsert('todos', 'todos', { ...t, prioridade: want });
+  }
+  setPref('planeadoPara', date);
+  emit();
+}
+
 // ---------- Dados de exemplo ----------
 
 export const hasSampleData = () =>
-  ['habits', 'checks', 'journal', 'events', 'goals', 'txs'].some((k) => state[k].some((x) => x.seed));
+  ['habits', 'checks', 'journal', 'events', 'goals', 'txs', 'todos'].some((k) => state[k].some((x) => x.seed));
 
 export async function clearSampleData() {
   const seedHabits = new Set(state.habits.filter((h) => h.seed).map((h) => h.id));
   await db.removeMany('habits', [...seedHabits]);
   await db.removeMany('checks', state.checks.filter((c) => c.seed || seedHabits.has(c.habitId)).map((c) => c.id));
-  for (const [store, key] of [['journal', 'journal'], ['events', 'events'], ['goals', 'goals'], ['transactions', 'txs']]) {
+  for (const [store, key] of [['journal', 'journal'], ['events', 'events'], ['goals', 'goals'], ['transactions', 'txs'], ['todos', 'todos']]) {
     await db.removeMany(store, state[key].filter((x) => x.seed).map((x) => x.id));
   }
   await reload();

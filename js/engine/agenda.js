@@ -1,11 +1,12 @@
 // Agenda: eventos, repetições, horas. Funções puras (testadas em tests.html).
-import { weekday, fromKey, pad } from './dates.js';
+import { weekday, fromKey, pad, addDays, daysBetween } from './dates.js';
 
 export const REPEAT = {
   nunca: 'Não se repete',
   diario: 'Todos os dias',
   semanal: 'Todas as semanas',
   mensal: 'Todos os meses',
+  anual: 'Todos os anos',
 };
 
 /** O evento acontece neste dia? (respeita repetições, data final e exceções) */
@@ -18,6 +19,7 @@ export function occursOn(ev, date) {
     case 'diario': return true;
     case 'semanal': return weekday(date) === weekday(ev.data);
     case 'mensal': return date.slice(8) === ev.data.slice(8);
+    case 'anual': return date.slice(5) === ev.data.slice(5);
     default: return false;
   }
 }
@@ -101,11 +103,29 @@ export function toICS(ev) {
   } else {
     lines.push(`DTSTART;VALUE=DATE:${stamp(ev.data)}`);
   }
-  const rule = { diario: 'DAILY', semanal: 'WEEKLY', mensal: 'MONTHLY' }[ev.repetir];
+  const rule = { diario: 'DAILY', semanal: 'WEEKLY', mensal: 'MONTHLY', anual: 'YEARLY' }[ev.repetir];
   if (rule) lines.push(`RRULE:FREQ=${rule}${ev.ate ? `;UNTIL=${ev.ate.replace(/-/g, '')}T235959Z` : ''}`);
   lines.push(`SUMMARY:${esc(ev.titulo)}`);
   if (ev.local) lines.push(`LOCATION:${esc(ev.local)}`);
   if (ev.notas) lines.push(`DESCRIPTION:${esc(ev.notas)}`);
   lines.push('END:VEVENT', 'END:VCALENDAR');
   return lines.join('\r\n');
+}
+
+/** Próxima data (>= hoje) em que o evento acontece, ou null. Procura até um ano e um dia. */
+export function nextOccurrence(ev, today) {
+  if ((ev.repetir || 'nunca') === 'nunca') return ev.data >= today ? ev.data : null;
+  for (let i = 0, d = today; i <= 366; i++, d = addDays(d, 1)) if (occursOn(ev, d)) return d;
+  return null;
+}
+
+/** Contagens decrescentes: eventos marcados com `contagem`, do mais próximo para o mais longe. */
+export function countdowns(events, today, limit = 3) {
+  return events
+    .filter((e) => e.contagem)
+    .map((e) => ({ ev: e, data: nextOccurrence(e, today) }))
+    .filter((x) => x.data)
+    .map((x) => ({ ...x, dias: daysBetween(today, x.data) }))
+    .sort((a, b) => a.dias - b.dias)
+    .slice(0, limit);
 }

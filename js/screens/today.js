@@ -23,6 +23,13 @@ import { goalCtx } from '../state.js';
 import { featuredWeekly } from '../engine/goals.js';
 import { spentOn, monthSummary, fmtEUR } from '../engine/money.js';
 import { actionSheet } from '../ui/sheet.js';
+import { todosOn } from '../engine/todos.js';
+import { countdowns } from '../engine/agenda.js';
+import { nudges } from '../engine/nudges.js';
+import { progress } from '../engine/goals.js';
+import { addDays } from '../engine/dates.js';
+import { quickAddHTML, bindQuickAdd, todoRowHTML, bindTodoRows, openTodoForm } from './todoUI.js';
+import { openPlanner, openInbox } from './planner.js';
 
 const goTab = (tab) => window.dispatchEvent(new CustomEvent('goto-tab', { detail: tab }));
 
@@ -33,7 +40,7 @@ export function habitRow({ habit, done, week }, today) {
   const s = streak(habit, state.idx, today);
   const meta = week ? `${week.count}/${week.n} esta semana` : frequencyLabel(habit);
   return `
-    <div class="swipe-row ${done ? 'done' : ''}" data-id="${esc(habit.id)}">
+    <div class="swipe-row habit-row ${done ? 'done' : ''}" data-id="${esc(habit.id)}">
       <div class="swipe-under">${done ? 'Desmarcar' : 'Feito'}</div>
       <div class="swipe-actions">
         <button type="button" class="sa-edit" data-swipe="edit">Editar</button>
@@ -56,6 +63,11 @@ export function createToday(section) {
     trailing: `<button class="icon-btn" type="button" data-action="settings" aria-label="Definições">${ICONS.gear}</button>`,
   });
   section.insertAdjacentHTML('beforeend', `<button class="fab" type="button" data-action="new" aria-label="Adicionar">${ICONS.plus}</button>`);
+  // Estrutura fixa: o campo de escrita rápida não é redesenhado (o teclado não fecha).
+  scr.content.innerHTML = `<div data-slot="a"></div><div data-slot="qa">${quickAddHTML('Nova tarefa… ex.: 18h ginásio')}</div><div data-slot="b"></div>`;
+  const slot = (n) => scr.content.querySelector(`[data-slot=${n}]`);
+  bindQuickAdd(scr.content, () => todayKey());
+  let weekGoalId = null;
 
   let holdUntil = 0;
   let pending = null;
@@ -66,6 +78,15 @@ export function createToday(section) {
     if (action === 'new') return quickAdd();
     if (action === 'journal') return openJournal();
     if (action === 'goto') return goTab(e.target.closest('[data-action]').dataset.tab);
+    if (action === 'plan') return openPlanner();
+    if (action === 'inbox') return openInbox();
+    if (action === 'nudge') return runNudge(e.target.closest('[data-action]').dataset.nudge);
+    if (action === 'dismiss-nudge') {
+      setPref('avisosFechados', { ...pruneDismissed(), [e.target.closest('[data-action]').dataset.nudge]: todayKey() });
+      return render();
+    }
+    const cd = e.target.closest('[data-countdown]');
+    if (cd) return openEventForm(state.events.find((x) => x.id === cd.dataset.countdown), { date: cd.dataset.date });
     const goal = e.target.closest('[data-goal]');
     if (goal) return openGoalSheet(goal.dataset.goal);
     const ev = e.target.closest('[data-ev]');
@@ -74,9 +95,9 @@ export function createToday(section) {
       setPref('bannerInstalarFechado', true);
       return render();
     }
-    const check = e.target.closest('.check');
+    const check = e.target.closest('.habit-row .check');
     if (check) return toggle(check.closest('.swipe-row'));
-    const row = e.target.closest('.swipe-row');
+    const row = e.target.closest('.habit-row');
     if (row) {
       const h = state.habits.find((x) => x.id === row.dataset.id);
       if (h) openHabitForm(h);
@@ -87,16 +108,33 @@ export function createToday(section) {
     const choice = await actionSheet({
       title: 'Adicionar',
       actions: [
+        { label: 'Tarefa', value: 'todo' },
         { label: 'Gasto', value: 'tx' },
         { label: 'Evento na agenda', value: 'ev' },
         { label: 'Hábito', value: 'habit' },
         { label: 'Meta', value: 'goal' },
       ],
     });
+    if (choice === 'todo') openTodoForm();
     if (choice === 'tx') openTxForm();
     if (choice === 'ev') openEventForm();
     if (choice === 'habit') openHabitForm();
     if (choice === 'goal') openGoalForm(null, { tipo: 'semana' });
+  }
+
+  // Remove avisos fechados em dias anteriores.
+  function pruneDismissed() {
+    const today = todayKey();
+    return Object.fromEntries(Object.entries(prefs.avisosFechados || {}).filter(([, d]) => d === today));
+  }
+
+  function runNudge(kind) {
+    if (kind === 'plan') return openPlanner();
+    if (kind === 'journal') return openJournal();
+    if (kind === 'goal' && weekGoalId) return openGoalSheet(weekGoalId);
+    if (kind === 'finance') return goTab('finance');
+    if (kind === 'backup') return openSettings();
+    if (kind === 'overdue') return slot('qa').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   async function toggle(row) {
@@ -108,12 +146,10 @@ export function createToday(section) {
     play(wasDone ? 'undo' : 'check');
     const res = await toggleCheck(row.dataset.id, today);
     if (res.done) {
-      const list = todayList(state.habits, state.idx, today);
-      if (list.length && list.every((i) => i.done)) {
-        setTimeout(() => { glow(); play('closed'); toast(closingLine(today), { long: true }); }, 250);
-      } else if (res.streak && MILESTONES.includes(res.streak.value) && res.streak.unit !== 'semanas') {
+      if (res.streak && MILESTONES.includes(res.streak.value) && res.streak.unit !== 'semanas') {
         toast(`${res.streak.value} dias. não quebres a corrente.`, { icon: '✦' });
       }
+      checkClosed();
     }
     schedule();
   }
@@ -128,6 +164,7 @@ export function createToday(section) {
   function render() {
     if (!state.ready) return;
     const today = todayKey();
+    const hour = new Date().getHours();
     const name = prefs.nome?.trim();
     scr.setCaps(capsDate(today));
     scr.setTitleHTML(`${greeting()}${name ? `, ${esc(name)}` : ''}.<span class="star">✦</span>`);
@@ -135,14 +172,38 @@ export function createToday(section) {
     scr.setSubtitle(t ? `“${t}”` : '');
 
     const list = todayList(state.habits, state.idx, today);
-    const doneN = list.filter((i) => i.done).length;
-    const pct = list.length ? Math.round((doneN / list.length) * 100) : 0;
-    const closed = list.length > 0 && doneN === list.length;
+    const tasks = todosOn(state.todos, today, today);
+    const habitsDone = list.filter((i) => i.done).length;
+    const tasksDone = tasks.filter((x) => x.todo.feito).length;
+    const total = list.length + tasks.length;
+    const doneN = habitsDone + tasksDone;
+    const pct = total ? Math.round((doneN / total) * 100) : 0;
+    const closed = total > 0 && doneN === total;
     const j = journalOn(today);
     const weekGoal = featuredWeekly(state.goals, today, goalCtx());
+    weekGoalId = weekGoal?.id || null;
     const agenda = agendaListHTML(today, { limit: 4 });
     const spentToday = spentOn(state.txs, today);
     const month = monthSummary(state.txs, today.slice(0, 7));
+    const cds = countdowns(state.events, today, 3);
+    const planned = prefs.planeadoPara === addDays(today, 1);
+
+    // Avisos ao abrir
+    let notes = [];
+    if (prefs.avisos) {
+      const wp = weekGoal && weekGoal.medida !== 'feito' ? progress(weekGoal, goalCtx()) : null;
+      notes = nudges({
+        today, hour,
+        journalToday: !!j,
+        plannedTomorrow: planned,
+        weekGoal: wp ? { titulo: weekGoal.titulo, falta: Math.round((wp.target - wp.value) * 100) / 100, unidade: weekGoal.unidade } : null,
+        budgetPct: prefs.orcamento ? month.despesas / prefs.orcamento : null,
+        lastBackup: prefs.ultimoBackup,
+        hasData: ['habits', 'todos', 'txs', 'journal', 'events', 'goals'].some((k) => state[k].some((x) => !x.seed)),
+        overdueCount: tasks.filter((x) => x.atrasada).length,
+        dismissed: prefs.avisosFechados || {},
+      });
+    }
 
     const installBanner = shouldShowInstallBanner(prefs.bannerInstalarFechado)
       ? `<div class="banner">
@@ -153,16 +214,45 @@ export function createToday(section) {
         </div>`
       : '';
 
-    scr.content.innerHTML = `
+    const nudgesHTML = notes.map((n) => `
+      <div class="nudge">
+        <button type="button" class="nudge-main" data-action="nudge" data-nudge="${n.action}"><span class="nudge-dot"></span>${esc(n.text)}</button>
+        <button type="button" class="icon-btn small" data-action="dismiss-nudge" data-nudge="${n.id}" aria-label="Fechar aviso">${ICONS.close}</button>
+      </div>`).join('');
+
+    const cdHTML = cds.length ? `
+      <div class="countdowns">${cds.map((c) => `
+        <button type="button" class="cd" data-countdown="${esc(c.ev.id)}" data-date="${c.data}">
+          <b>${c.dias === 0 ? 'Hoje' : c.dias}</b><span>${c.dias === 0 ? '' : c.dias === 1 ? 'dia' : 'dias'}</span>
+          <em>${esc(c.ev.titulo)}</em>
+        </button>`).join('')}</div>` : '';
+
+    const left = [];
+    if (tasks.length - tasksDone) left.push(`${tasks.length - tasksDone} ${tasks.length - tasksDone === 1 ? 'tarefa' : 'tarefas'}`);
+    if (list.length - habitsDone) left.push(`${list.length - habitsDone} ${list.length - habitsDone === 1 ? 'hábito' : 'hábitos'}`);
+
+    slot('a').innerHTML = `
       ${installBanner}
+      ${nudgesHTML}
+      ${cdHTML}
       <div class="card summary ${closed ? 'closed' : ''}">
-        <div class="ring-progress" style="--p:${pct}"><span>${doneN}/${list.length}</span></div>
+        <div class="ring-progress" style="--p:${pct}"><span>${doneN}/${total}</span></div>
         <div>
-          <div class="caps small">Hábitos de hoje</div>
-          <div class="summary-title">${closed ? 'Dia fechado ✦' : list.length ? `${list.length - doneN} por fazer` : 'Sem hábitos hoje'}</div>
-          <div class="muted">${closed ? 'O resto do dia é teu.' : 'Desliza → para marcar'}</div>
+          <div class="caps small">O teu dia</div>
+          <div class="summary-title">${closed ? 'Dia fechado ✦' : total ? `${left.join(' · ')} por fazer` : 'Dia livre'}</div>
+          <div class="muted">${closed ? 'O resto do dia é teu.' : 'Desliza → para concluir'}</div>
         </div>
       </div>
+
+      <div class="sec"><span class="caps">Tarefas${tasks.length ? ` · ${tasksDone}/${tasks.length}` : ''}</span><button type="button" class="sec-link" data-action="inbox">Sem data</button></div>`;
+
+    slot('b').innerHTML = `
+      ${tasks.length ? `<div class="group list">${tasks.map((x) => todoRowHTML(x, today)).join('')}</div>` : ''}
+
+      ${hour >= 18 && !planned ? `
+        <button type="button" class="card plan-card" data-action="plan">
+          <span class="plan-star">✦</span><div><strong>Planear amanhã</strong><span class="muted small">Escolhe as 3 que importam. 1 minuto.</span></div><span class="chev">${ICONS.chevron}</span>
+        </button>` : ''}
 
       ${weekGoal ? `<div class="sec"><span class="caps">Meta da semana</span><button type="button" class="sec-link" data-action="goto" data-tab="goals">Todas</button></div>${goalCardHTML(weekGoal, { compact: true })}` : ''}
 
@@ -190,9 +280,10 @@ export function createToday(section) {
              <p class="jc-prompt">${esc(journalPrompt(today))}</p>`}
       </button>
 
+      ${planned ? '<p class="group-footer center">Amanhã já está planeado ✦ <button type="button" class="link-btn inline" data-action="plan">rever</button></p>' : ''}
       ${whisper('hoje-fim')}`;
 
-    scr.content.querySelectorAll('.swipe-row').forEach((row) => {
+    slot('b').querySelectorAll('.habit-row').forEach((row) => {
       const h = state.habits.find((x) => x.id === row.dataset.id);
       attachSwipe(row, {
         onRight: () => toggle(row),
@@ -200,6 +291,15 @@ export function createToday(section) {
         onDelete: () => confirmDeleteHabit(h),
       });
     });
+    bindTodoRows(slot('b'), { onToggled: (res) => { holdUntil = performance.now() + 600; if (res?.done) checkClosed(); } });
+  }
+
+  function checkClosed() {
+    const today = todayKey();
+    const list = todayList(state.habits, state.idx, today);
+    const tasks = todosOn(state.todos, today, today);
+    const all = [...list.map((i) => i.done), ...tasks.map((x) => x.todo.feito)];
+    if (all.length && all.every(Boolean)) setTimeout(() => { glow(); play('closed'); toast(closingLine(today), { long: true }); }, 250);
   }
 
   return { render: schedule, scroller: scr.scroller };

@@ -82,6 +82,9 @@ export function buildSampleExtras(today, habits = []) {
     ev('Jantar de aniversário do Rui', d(1), '21:00', '23:30', { local: 'Bairro Alto' }),
     ev('Entrega do trabalho de grupo', d(3), '', '', {}),
     ev('Corte de cabelo', d(2), '17:00', '17:45'),
+    ev('Exame de Finanças Empresariais', d(12), '09:00', '11:00', { local: 'Anfiteatro A', contagem: true }),
+    ev('Viagem a Madrid ✈️', d(34), '', '', { contagem: true }),
+    ev('Aniversário da mãe 🎂', d(19), '', '', { repetir: 'anual', contagem: true }),
   ];
 
   let ordem = 0;
@@ -118,7 +121,28 @@ export function buildSampleExtras(today, habits = []) {
     tx('despesa', 1450, 'comida', 0, 'Almoço com a Inês'),
   ].filter(Boolean);
 
-  return { events, goals, transactions };
+  return { events, goals, transactions, todos: buildSampleTodos(today, goals) };
+}
+
+/** Exemplos da Fase C: tarefas. */
+export function buildSampleTodos(today, goals = []) {
+  const d = (n) => addDays(today, n);
+  const books = goals.find((g) => g.titulo === 'Ler 2 livros');
+  let ordem = 0;
+  const t = (titulo, data, extra = {}) => ({ id: uid(), titulo, data, hora: '', prioridade: false, nota: '', passos: [], feito: false, repetir: 'nunca', ordem: ordem++, seed: true, ...extra });
+  return [
+    t('Enviar email ao professor de Finanças', d(0), { prioridade: true, hora: '11:00' }),
+    t('Trabalho de grupo: slides', d(0), { prioridade: true, passos: [
+      { id: uid(), texto: 'Pesquisa', feito: true }, { id: uid(), texto: 'Fazer os slides', feito: false }, { id: uid(), texto: 'Ensaiar', feito: false }] }),
+    t('Lavar a roupa', d(0)),
+    t('Pagar a quota do ginásio', d(-1)),
+    t('Ler capítulo 5', d(0), { goalId: books?.id, nota: 'Conta para "Ler 2 livros"' }),
+    t('Comprar presente para a mãe', d(3), { prioridade: true }),
+    t('Marcar dentista', d(1), { hora: '10:00' }),
+    t('Pagar a renda', d(5), { repetir: 'mensal' }),
+    t('Ver documentário sobre investimento', null),
+    t('Organizar fotos do verão', null),
+  ];
 }
 
 function weekdayOf(key) {

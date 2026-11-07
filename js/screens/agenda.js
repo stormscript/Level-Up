@@ -7,6 +7,9 @@ import { createScreen } from '../ui/screen.js';
 import { esc, ICONS } from '../ui/dom.js';
 import { whisper } from '../ui/phrase.js';
 import { openEventForm } from './eventForm.js';
+import { todosOn, datesWithTodos, inbox } from '../engine/todos.js';
+import { quickAddHTML, bindQuickAdd, todoRowHTML, bindTodoRows } from './todoUI.js';
+import { openInbox } from './planner.js';
 
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const nowHHMM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -43,7 +46,14 @@ export function agendaListHTML(date, { limit = 0 } = {}) {
 }
 
 export function createAgenda(section) {
-  const scr = createScreen(section, { title: 'Agenda' });
+  const scr = createScreen(section, {
+    title: 'Agenda',
+    trailing: `<button class="icon-btn inbox-btn" type="button" data-action="inbox" aria-label="Tarefas sem data">${ICONS.inbox}<span class="badge" hidden></span></button>`,
+  });
+  // Estrutura fixa: o campo de escrita rápida nunca é redesenhado (o teclado não fecha).
+  scr.content.innerHTML = `<div data-slot="top"></div><div data-slot="qa">${quickAddHTML()}</div><div data-slot="list"></div>`;
+  const slot = (n) => scr.content.querySelector(`[data-slot=${n}]`);
+  bindQuickAdd(scr.content, () => selected);
   section.insertAdjacentHTML('beforeend', `<button class="fab" type="button" data-action="new" aria-label="Novo evento">${ICONS.plus}</button>`);
 
   let selected = todayKey();
@@ -62,6 +72,7 @@ export function createAgenda(section) {
     }
     const a = t.dataset.action;
     if (a === 'new') return openEventForm(null, { date: selected });
+    if (a === 'inbox') return openInbox();
     if (a === 'today') { selected = todayKey(); month = selected.slice(0, 7); return render(); }
     if (a === 'prev-week') { selected = addDays(selected, -7); return render(); }
     if (a === 'next-week') { selected = addDays(selected, 7); return render(); }
@@ -94,13 +105,15 @@ export function createAgenda(section) {
     const start = weekStart(selected);
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
     const has = datesWithEvents(state.events, days);
+    const hasT = datesWithTodos(state.todos, days);
     const today = todayKey();
     return `
       <div class="week-strip">
         <button type="button" class="strip-arrow" data-action="prev-week" aria-label="Semana anterior">‹</button>
         ${days.map((d) => `
           <button type="button" class="day ${d === selected ? 'sel' : ''} ${d === today ? 'today' : ''}" data-day="${d}">
-            <span>${WEEKDAY_SHORT[weekday(d)]}</span><b>${fromKey(d).getDate()}</b><i class="${has.has(d) ? 'on' : ''}"></i>
+            <span>${WEEKDAY_SHORT[weekday(d)]}</span><b>${fromKey(d).getDate()}</b>
+            <em>${has.has(d) ? '<i class="on"></i>' : ''}${hasT.has(d) ? '<i class="td"></i>' : ''}</em>
           </button>`).join('')}
         <button type="button" class="strip-arrow" data-action="next-week" aria-label="Semana seguinte">›</button>
       </div>`;
@@ -112,6 +125,7 @@ export function createAgenda(section) {
     const total = lastDayOfMonth(month);
     const days = Array.from({ length: total }, (_, i) => `${month}-${pad(i + 1)}`);
     const has = datesWithEvents(state.events, days);
+    const hasT = datesWithTodos(state.todos, days);
     const today = todayKey();
     return `
       <div class="month-nav">
@@ -124,34 +138,50 @@ export function createAgenda(section) {
         ${'<span></span>'.repeat(offset)}
         ${days.map((d) => `
           <button type="button" class="mg-day ${d === selected ? 'sel' : ''} ${d === today ? 'today' : ''}" data-day="${d}">
-            ${fromKey(d).getDate()}<i class="${has.has(d) ? 'on' : ''}"></i>
+            ${fromKey(d).getDate()}<em>${has.has(d) ? '<i class="on"></i>' : ''}${hasT.has(d) ? '<i class="td"></i>' : ''}</em>
           </button>`).join('')}
       </div>
-      <p class="group-footer">Toca num dia para ver os eventos.</p>`;
+      <p class="group-footer">Toca num dia para ver tudo. <span class="legend"><i class="on"></i> eventos <i class="td"></i> tarefas</span></p>`;
   }
 
   function render() {
     if (!state.ready) return;
     const today = todayKey();
     scr.setCaps(view === 'dia' ? monthLabel(selected) : 'Vista do mês');
-    const list = agendaListHTML(selected);
+    const n = inbox(state.todos).length;
+    const badge = section.querySelector('.inbox-btn .badge');
+    badge.hidden = !n;
+    badge.textContent = n;
+
     const rel = selected === today ? 'Hoje' : selected === addDays(today, 1) ? 'Amanhã' : selected === addDays(today, -1) ? 'Ontem' : '';
-    scr.content.innerHTML = `
+    const controls = `
       <div class="agenda-controls">
         <div class="segmented">
           <button type="button" data-view="dia" aria-pressed="${view === 'dia'}">Dia</button>
           <button type="button" data-view="mes" aria-pressed="${view === 'mes'}">Mês</button>
         </div>
         <button type="button" class="pill-btn" data-action="today" ${selected === today && month === today.slice(0, 7) ? 'disabled' : ''}>Hoje</button>
-      </div>
-      ${view === 'dia'
-        ? `${weekStrip()}
-           <div class="sec"><span class="caps">${esc(rel ? `${rel} · ` : '')}${esc(formatLong(selected))}</span></div>
-           ${list
-             ? `<div class="group ev-list">${list}</div>`
-             : `<div class="empty small"><p>Nada marcado.<br>Toca em <b>+</b> para adicionar.</p></div>`}`
-        : monthGrid()}
+      </div>`;
+    slot('qa').hidden = view !== 'dia';
+
+    if (view === 'mes') {
+      slot('top').innerHTML = controls + monthGrid();
+      slot('list').innerHTML = whisper('agenda-fim');
+      return;
+    }
+
+    const tasks = todosOn(state.todos, selected, today);
+    const doneN = tasks.filter((x) => x.todo.feito).length;
+    const events = agendaListHTML(selected);
+    slot('top').innerHTML = `${controls}${weekStrip()}
+      <div class="sec"><span class="caps">${esc(rel ? `${rel} · ` : '')}${esc(formatLong(selected))}</span></div>
+      <div class="sub-sec"><span>Tarefas${tasks.length ? ` · ${doneN}/${tasks.length}` : ''}</span></div>`;
+    slot('list').innerHTML = `
+      ${tasks.length ? `<div class="group list">${tasks.map((x) => todoRowHTML(x, today)).join('')}</div>` : ''}
+      <div class="sub-sec"><span>Eventos</span><button type="button" class="sec-link" data-action="new">+ Evento</button></div>
+      ${events ? `<div class="group ev-list">${events}</div>` : '<div class="empty small"><p>Nada marcado.</p></div>'}
       ${whisper('agenda-fim')}`;
+    bindTodoRows(slot('list'));
   }
 
   // Atualiza a linha "agora" de minuto a minuto, quando o ecrã está visível.

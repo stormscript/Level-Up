@@ -1,7 +1,7 @@
 // Deslizar linhas: para a direita = concluir (ou desfazer), para a esquerda = mostrar Editar/Apagar.
 // Usa pointer events + `touch-action: pan-y`: o scroll vertical continua nativo.
 
-const ACTIONS_W = 152;
+const ACTION_W = 76;
 let openRow = null;
 
 export function closeOpenRow() {
@@ -13,8 +13,9 @@ document.addEventListener('pointerdown', (e) => {
   if (openRow && !openRow.row.contains(e.target)) closeOpenRow();
 }, true);
 
-export function attachSwipe(row, { onRight, onEdit, onDelete }) {
+export function attachSwipe(row, { onRight, onEdit, onDelete, onAction }) {
   const content = row.querySelector('.swipe-content');
+  const ACTIONS_W = (row.querySelectorAll('.swipe-actions button').length || 2) * ACTION_W;
   let x0 = null, y0 = 0, dx = 0, base = 0, mode = null, pid = null, width = 0, suppress = false;
 
   const setX = (x, animate) => {
@@ -96,4 +97,6 @@ export function attachSwipe(row, { onRight, onEdit, onDelete }) {
 
   row.querySelector('[data-swipe=edit]')?.addEventListener('click', () => { closeOpenRow(); onEdit?.(); });
   row.querySelector('[data-swipe=delete]')?.addEventListener('click', () => { closeOpenRow(); onDelete?.(); });
+  row.querySelectorAll('[data-swipe]:not([data-swipe=edit]):not([data-swipe=delete])').forEach((b) =>
+    b.addEventListener('click', () => { closeOpenRow(); onAction?.(b.dataset.swipe); }));
 }

@@ -32,6 +32,7 @@ export const ICONS = {
   check: svg('<path class="ck" d="M6 12.5l4 4 8-9"/>', 'stroke-width="3"'),
   close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
   share: svg('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/>'),
+  inbox: svg('<path d="M3.5 13.5l2.6-7.2A2 2 0 0 1 8 5h8a2 2 0 0 1 1.9 1.3l2.6 7.2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 13.5h4.5l1.5 2.5h5l1.5-2.5h4.5"/>', 'stroke-width="1.8"'),
   chevron: svg('<path d="M9 5l7 7-7 7"/>', 'stroke-width="2.2"'),
   pen: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>', 'stroke-width="1.8"'),
 };

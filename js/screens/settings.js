@@ -6,7 +6,7 @@ import { toast } from '../ui/effects.js';
 import { el, esc } from '../ui/dom.js';
 import { todayKey } from '../engine/dates.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 
 export function openSettings() {
   const body = el(`<div class="form"></div>`);
@@ -37,7 +37,10 @@ export function openSettings() {
       <div class="group">
         <label class="cell"><span class="cell-label">Som ao marcar</span>
           <input type="checkbox" class="switch" data-pref="som" ${prefs.som ? 'checked' : ''}></label>
+        <label class="cell"><span class="cell-label">Avisos ao abrir a app</span>
+          <input type="checkbox" class="switch" data-pref="avisos" ${prefs.avisos ? 'checked' : ''}></label>
       </div>
+      <p class="group-footer">Tarefas atrasadas, planear amanhã, diário, metas, orçamento e backup. No máximo 2 de cada vez.</p>
 
       <div class="group-header">Os teus dados</div>
       <div class="group">
@@ -66,7 +69,7 @@ export function openSettings() {
     if (action === 'clear-sample') {
       const ok = await actionSheet({
         title: 'Apagar dados de exemplo?',
-        message: 'Remove os hábitos e o diário de exemplo. O que criaste fica.',
+        message: 'Remove tudo o que é de exemplo (hábitos, tarefas, agenda, metas, finanças, diário). O que criaste fica.',
         actions: [{ label: 'Apagar exemplos', destructive: true }],
       });
       if (ok) { await clearSampleData(); toast('Exemplos apagados'); render(); }
@@ -83,7 +86,7 @@ export function openSettings() {
 
   body.addEventListener('change', async (e) => {
     const k = e.target.dataset.pref;
-    if (k === 'som' || k === 'mostrarFrases') setPref(k, e.target.checked);
+    if (k === 'som' || k === 'mostrarFrases' || k === 'avisos') setPref(k, e.target.checked);
     if (e.target.matches('[data-import]')) {
       const file = e.target.files?.[0];
       e.target.value = '';
