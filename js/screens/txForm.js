@@ -7,13 +7,14 @@ import { esc, el } from '../ui/dom.js';
 import { openSheet, actionSheet } from '../ui/sheet.js';
 import { toast } from '../ui/effects.js';
 
-export function openTxForm(existing = null, { tipo = 'despesa' } = {}) {
+export function openTxForm(existing = null, { tipo = 'despesa', prefill = null } = {}) {
   const f = {
-    tipo: existing?.tipo || tipo,
-    categoria: existing?.categoria || null,
+    tipo: existing?.tipo || prefill?.tipo || tipo,
+    categoria: existing?.categoria || prefill?.categoria || null,
     data: existing?.data || todayKey(),
   };
-  const amountText = existing ? (existing.valor / 100).toFixed(2).replace('.', ',') : '';
+  const base = existing || prefill;
+  const amountText = base?.valor ? (base.valor / 100).toFixed(2).replace('.', ',') : '';
 
   const form = el(`
     <form class="form tx-form" novalidate autocomplete="off">
@@ -30,7 +31,7 @@ export function openTxForm(existing = null, { tipo = 'despesa' } = {}) {
       </label>
       <div class="cat-grid" data-cats></div>
       <div class="group" style="margin-top:16px">
-        <div class="cell"><input name="nota" type="text" maxlength="60" placeholder="Nota (opcional)" value="${esc(existing?.nota || '')}" aria-label="Nota" enterkeyhint="done"></div>
+        <div class="cell"><input name="nota" type="text" maxlength="60" placeholder="Nota (opcional)" value="${esc(existing?.nota || prefill?.nota || '')}" aria-label="Nota" enterkeyhint="done"></div>
         <label class="cell"><span class="cell-label">Data</span><input type="date" name="data" value="${esc(f.data)}"></label>
       </div>
       <div class="form-actions">

@@ -109,3 +109,59 @@ export function heatFill(v) {
   if (v <= 0) return '#1d1d20';
   return `rgba(255,42,61,${(0.28 + 0.72 * Math.min(1, v)).toFixed(2)})`;
 }
+
+/** Paleta para categorias (vermelhos, brancos e cinzentos, no estilo da app). */
+export const CAT_COLORS = ['#FF2A3D', '#FFFFFF', '#FF7A86', '#9E1B29', '#B9B9BE', '#FFB3BA', '#6E6E73', '#D4384A', '#48484A', '#FFD9DC', '#5A0F17', '#8E8E93'];
+
+/**
+ * Donut. items: [{ value, color, label }]. center: { big, small }.
+ */
+export function donut(items, { size = 150, thick = 20, center = {} } = {}) {
+  const total = items.reduce((s, i) => s + i.value, 0);
+  const r = (size - thick) / 2;
+  const c = size / 2;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  const gap = items.length > 1 ? 2 : 0;
+  const arcs = total ? items.map((it) => {
+    const len = (it.value / total) * circ;
+    const dash = Math.max(0, len - gap);
+    const el = `<circle cx="${c}" cy="${c}" r="${r.toFixed(2)}" fill="none" stroke="${it.color}" stroke-width="${thick}"
+      stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${c} ${c})"/>`;
+    offset += len;
+    return el;
+  }).join('') : `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="${thick}"/>`;
+  return `
+    <svg class="chart donut" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Gastos por categoria">
+      ${arcs}
+      <text x="${c}" y="${c - 2}" text-anchor="middle" font-size="18" font-weight="800" fill="#fff" font-family="-apple-system, system-ui, sans-serif">${esc(center.big || '')}</text>
+      <text x="${c}" y="${c + 16}" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.5)" font-family="-apple-system, system-ui, sans-serif">${esc(center.small || '')}</text>
+    </svg>`;
+}
+
+/**
+ * Barras agrupadas (ex.: entrou vs. saiu por mês).
+ * groups: [{ label, a, b, current }] com a = vermelho, b = branco (valores já em unidades a mostrar).
+ */
+export function groupedBars(groups, { height = 140, fmt = (v) => String(v) } = {}) {
+  const H = height, top = 14, bottom = 18;
+  const n = groups.length || 1;
+  const gap = 12;
+  const gw = (W - gap * (n - 1)) / n;
+  const bw = (gw - 4) / 2;
+  const max = Math.max(1, ...groups.flatMap((g) => [g.a, g.b]));
+  const hOf = (v) => (v / max) * (H - top - bottom);
+  return `
+    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Entradas e saídas por mês">
+      <g stroke="rgba(255,255,255,.06)"><line x1="0" x2="${W}" y1="${H - bottom}" y2="${H - bottom}"/></g>
+      ${groups.map((g, i) => {
+        const x = i * (gw + gap);
+        const ha = hOf(g.a), hb = hOf(g.b);
+        return `
+          <rect x="${x.toFixed(1)}" y="${(H - bottom - ha).toFixed(1)}" width="${bw.toFixed(1)}" height="${ha.toFixed(1)}" rx="4" fill="${g.current ? '#FF2A3D' : 'rgba(255,42,61,.6)'}"/>
+          <rect x="${(x + bw + 4).toFixed(1)}" y="${(H - bottom - hb).toFixed(1)}" width="${bw.toFixed(1)}" height="${hb.toFixed(1)}" rx="4" fill="${g.current ? '#ffffff' : 'rgba(255,255,255,.45)'}"/>
+          ${g.a ? `<text x="${(x + bw / 2).toFixed(1)}" y="${(H - bottom - ha - 3).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.75)">${esc(fmt(g.a))}</text>` : ''}
+          <text x="${(x + gw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="${g.current ? '#FF2A3D' : 'rgba(255,255,255,.45)'}">${esc(g.label)}</text>`;
+      }).join('')}
+    </svg>`;
+}

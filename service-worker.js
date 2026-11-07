@@ -2,7 +2,7 @@
 //
 // ⚠️ SEMPRE QUE ALTERARES QUALQUER FICHEIRO DA APP, MUDA ESTE NÚMERO (ex.: v0.1.0 → v0.1.1).
 // É isso que avisa o iPhone de que há uma versão nova.
-const CACHE_VERSION = 'levelup-v0.7.0';
+const CACHE_VERSION = 'levelup-v0.8.0';
 
 // Todos os ficheiros da app. Se criares um ficheiro novo, acrescenta-o aqui.
 const ASSETS = [
@@ -27,6 +27,7 @@ const ASSETS = [
   './js/prefs.js',
   './js/screens/agenda.js',
   './js/screens/eventForm.js',
+  './js/screens/finSheets.js',
   './js/screens/finance.js',
   './js/screens/goalForm.js',
   './js/screens/goalSheet.js',

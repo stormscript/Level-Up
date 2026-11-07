@@ -24,7 +24,7 @@
     import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting, shortDate, longDate } from './js/engine/dates.js';
     import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1, dayState, totalDone, todaySummary, bestActive, atRisk, avoidList, qtyOn, weekdayRates, weakestDay, monthRates, dayScore, isPaused } from './js/engine/habits.js';
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
-    import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth } from './js/engine/money.js';
+    import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth, cumulativeByDay, projectMonth, monthsSeries, prevMonth, vsPrevMonth, categoryStatus, frequentTxs, dueRecurring, nextRecurring, recurringDate, recurringTotal } from './js/engine/money.js';
     import { periodRange, progress, shiftPeriod, currentPeriod, goalsFor, featuredWeekly, weekLabel } from './js/engine/goals.js';
     import { todosOn, overdue, inbox, nextDate, prioritiesOn, stepsLabel } from './js/engine/todos.js';
     import { parseQuick } from './js/engine/parse.js';
@@ -196,6 +196,43 @@
       const p = budgetPace(26000, 60000, '2026-11-05'); // faltam 26 dias (5 a 30)
       eq(p.daysLeft, 26); eq(p.left, 34000); eq(p.perDay, 1307); ok(!p.over);
       ok(budgetPace(70000, 60000, '2026-11-05').over);
+    });
+
+    group('Finanças 2.0');
+    test('Gasto acumulado por dia e previsão do fim do mês', () => {
+      const c = cumulativeByDay(TXS, '2026-11', THU);
+      eq(c.map((x) => x.v), [0, 1250, 5250, 5250, 6000]);
+      eq(projectMonth(TXS, '2026-11', THU), 36000); // 60 € em 5 dias → 360 € em 30
+      eq(projectMonth(TXS, '2026-11', '2026-11-03'), null); eq(projectMonth(TXS, '2026-10', THU), null);
+      eq(cumulativeByDay(TXS, '2026-10', THU).length, 31);
+    });
+    test('Meses anteriores, série e comparação até ao mesmo dia', () => {
+      eq(prevMonth('2026-01'), '2025-12'); eq(prevMonth('2026-11', -1), '2026-12');
+      eq(monthsSeries(TXS, ['2026-10', '2026-11']).map((m) => [m.despesas, m.receitas]), [[9999, 0], [6000, 45000]]);
+      const txs = [T('despesa', 1000, 'x', '2026-10-02'), T('despesa', 5000, 'x', '2026-10-20'), T('despesa', 1500, 'x', '2026-11-03')];
+      const v = vsPrevMonth(txs, '2026-11', THU); eq([v.a, v.b], [1500, 1000]); eq(v.pct, 0.5);
+      eq(vsPrevMonth([T('despesa', 100, 'x', THU)], '2026-11', THU), null);
+    });
+    test('Limites por categoria', () => {
+      const st = categoryStatus(TXS, '2026-11', { comida: 2500, saidas: 6000 });
+      eq(st.map((c) => [c.id, c.total, c.limit]), [['transporte', 4000, null], ['comida', 2000, 2500], ['saidas', 0, 6000]]);
+      eq(st[1].pct, 0.8); ok(!st[1].over);
+      ok(categoryStatus(TXS, '2026-11', { comida: 1500 }).find((c) => c.id === 'comida').over);
+    });
+    test('Gastos frequentes (repetir com um toque)', () => {
+      const txs = [T('despesa', 120, 'comida', '2026-11-01'), T('despesa', 130, 'comida', '2026-11-04'), T('despesa', 4000, 'transporte', '2026-11-02')];
+      txs[0].nota = 'Café'; txs[1].nota = 'café';
+      const f = frequentTxs(txs, THU); eq(f.length, 1); eq([f[0].categoria, f[0].valor, f[0].count], ['comida', 130, 2]);
+    });
+    test('Fixos: lançamentos em falta, dia ajustado e próximo', () => {
+      const r = { id: 'r', dia: 31, valor: 1199, inicio: '2026-09', ativo: true };
+      eq(recurringDate(r, '2026-11'), '2026-11-30'); eq(recurringDate(r, '2027-02'), '2027-02-28');
+      eq(dueRecurring(r, THU).map((x) => x.data), ['2026-09-30', '2026-10-31']);
+      eq(dueRecurring({ ...r, ultimoMes: '2026-10' }, THU), []);
+      eq(dueRecurring({ ...r, dia: 3, ultimoMes: '2026-10' }, THU).map((x) => x.data), ['2026-11-03']);
+      eq(dueRecurring({ ...r, ativo: false }, THU), []);
+      eq(nextRecurring({ ...r, dia: 12 }, THU), '2026-11-12'); eq(nextRecurring({ ...r, dia: 3, ultimoMes: '2026-11' }, THU), '2026-12-03');
+      eq(recurringTotal([{ valor: 1000 }, { valor: 500, tipo: 'receita' }, { valor: 300, ativo: false }]), 1000);
     });
 
     // ---------- Metas ----------

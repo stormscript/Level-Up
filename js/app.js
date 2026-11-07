@@ -1,5 +1,5 @@
 // Arranque da app: ecrãs, tab bar, service worker.
-import { load, subscribe } from './state.js';
+import { load, subscribe, refreshDaily } from './state.js';
 import { todayKey } from './engine/dates.js';
 import { initKeyboardHandling } from './ui/sheet.js';
 import { closeOpenRow } from './ui/swipe.js';
@@ -116,6 +116,7 @@ async function start() {
     if (document.visibilityState === 'visible') {
       // Mudou o dia (ou a parte do dia) enquanto a app estava fechada.
       if (todayKey() !== lastDay) lastDay = todayKey();
+      refreshDaily().catch(() => {});
       renderAll();
     }
   });

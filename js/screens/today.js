@@ -22,7 +22,7 @@ import { openGoalSheet } from './goalSheet.js';
 import { openTxForm } from './txForm.js';
 import { goalCtx } from '../state.js';
 import { featuredWeekly } from '../engine/goals.js';
-import { spentOn, monthSummary, fmtEUR } from '../engine/money.js';
+import { spentOn, monthSummary, fmtEUR, categoryStatus, categoryById } from '../engine/money.js';
 import { actionSheet } from '../ui/sheet.js';
 import { todosOn } from '../engine/todos.js';
 import { countdowns } from '../engine/agenda.js';
@@ -272,6 +272,10 @@ export function createToday(section) {
         lastBackup: prefs.ultimoBackup,
         hasData: ['habits', 'todos', 'txs', 'journal', 'events', 'goals'].some((k) => state[k].some((x) => !x.seed)),
         overdueCount: tasks.filter((x) => x.atrasada).length,
+        catWarning: (() => {
+          const c = categoryStatus(state.txs, today.slice(0, 7), prefs.limites || {}).filter((x) => x.pct != null && x.pct >= 0.9).sort((a, b) => b.pct - a.pct)[0];
+          return c ? { nome: categoryById(c.id).nome, pct: c.pct, over: c.over } : null;
+        })(),
         dismissed: prefs.avisosFechados || {},
       });
     }

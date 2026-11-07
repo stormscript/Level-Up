@@ -5,9 +5,10 @@ import { uid } from './seed.js';
 import { todayKey, addDays } from './engine/dates.js';
 import { checkId, makeIndex, migrateV1, streak, dayState, isAvoid, isQty } from './engine/habits.js';
 import { nextDate } from './engine/todos.js';
+import { dueRecurring, recurringDate } from './engine/money.js';
 
 export const state = {
-  habits: [], checks: [], journal: [], events: [], goals: [], txs: [], todos: [], objectives: [],
+  habits: [], checks: [], journal: [], events: [], goals: [], txs: [], todos: [], objectives: [], recurring: [],
   idx: new Set(), ready: false,
 };
 
@@ -55,12 +56,15 @@ async function reload() {
   );
   state.todos = todos;
   state.objectives = await db.getAll('objectives');
+  state.recurring = await db.getAll('recurring');
   state.habits = habits.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
   state.checks = checks;
   state.journal = journal.sort((a, b) => (a.data < b.data ? 1 : -1));
   state.events = events;
   state.goals = goals;
   state.txs = txs;
+  // Lança os fixos em falta depois de todas as listas estarem carregadas.
+  await launchRecurring();
   state.ready = true;
   emit();
 }
@@ -265,6 +269,51 @@ export function saveTx(tx) {
   return upsert('transactions', 'txs', t);
 }
 export const deleteTx = (id) => removeFrom('transactions', 'txs', id);
+
+// ---------- Fixos (lançados sozinhos todos os meses) ----------
+
+/** Lança os movimentos fixos em falta até hoje. Chamado ao abrir a app. */
+export async function launchRecurring(today = todayKey()) {
+  let created = 0;
+  for (const r of state.recurring) {
+    const due = dueRecurring(r, today);
+    if (!due.length) continue;
+    const txs = due.map(({ month, data }) => ({
+      id: `${r.id}|${month}`, tipo: r.tipo || 'despesa', valor: r.valor, categoria: r.categoria,
+      nota: r.nota, data, ts: Date.now(), fixoId: r.id,
+    }));
+    await db.putMany('transactions', txs);
+    for (const t of txs) if (!state.txs.some((x) => x.id === t.id)) state.txs.push(t);
+    r.ultimoMes = due[due.length - 1].month;
+    await db.put('recurring', r);
+    created += txs.length;
+  }
+  return created;
+}
+
+/** Ao voltar à app (pode ter mudado o dia): lança os fixos em falta e atualiza os ecrãs. */
+export async function refreshDaily() {
+  const n = await launchRecurring();
+  if (n) emit();
+  return n;
+}
+
+export async function saveRecurring(r, { launchThisMonth = false } = {}) {
+  const isNew = !r.id;
+  const x = stamp({ tipo: 'despesa', ativo: true, ...r });
+  delete x.criadoEm;
+  const today = todayKey();
+  if (!x.inicio) x.inicio = today.slice(0, 7);
+  // Ao criar: se o dia deste mês já passou, só lança este mês se pedires (evita duplicar o que já registaste).
+  if (isNew && !launchThisMonth && recurringDate(x, today.slice(0, 7)) <= today) x.ultimoMes = today.slice(0, 7);
+  await upsert('recurring', 'recurring', x);
+  await launchRecurring();
+  emit();
+  return x;
+}
+
+/** Apaga o fixo. Os movimentos já lançados ficam (são história). */
+export const deleteRecurring = (id) => removeFrom('recurring', 'recurring', id);
 
 // ---------- Tarefas ----------
 

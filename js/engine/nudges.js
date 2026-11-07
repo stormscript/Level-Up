@@ -29,6 +29,10 @@ export function nudges(ctx, max = 2) {
     const f = ctx.weekGoal.falta;
     push('meta', `Faltam ${f}${ctx.weekGoal.unidade ? ` ${ctx.weekGoal.unidade}` : ''} para "${ctx.weekGoal.titulo}".`, 'goal');
   }
+  if (ctx.catWarning) {
+    const c = ctx.catWarning;
+    push('limite', c.over ? `${c.nome}: passaste o limite do mês.` : `${c.nome}: já gastaste ${Math.round(c.pct * 100)}% do limite.`, 'finance');
+  }
   if (ctx.budgetPct != null && ctx.budgetPct >= 0.8) {
     push('orcamento', ctx.budgetPct >= 1 ? 'Passaste o orçamento do mês.' : `Já gastaste ${Math.round(ctx.budgetPct * 100)}% do orçamento.`, 'finance');
   }
