@@ -70,9 +70,42 @@ export function barChart(items, { height = 120 } = {}) {
         const y = H - bottom - h;
         return `
           <rect x="${x.toFixed(1)}" y="${top}" width="${bw.toFixed(1)}" height="${H - top - bottom}" rx="6" fill="rgba(255,255,255,.04)"/>
-          ${it.pct == null ? '' : `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="6" fill="${it.current ? '#FF2A3D' : 'rgba(255,42,61,.55)'}"/>`}
+          ${it.pct == null ? '' : `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="6" fill="${it.color || (it.current ? '#FF2A3D' : 'rgba(255,42,61,.55)')}"/>`}
           <text x="${(x + bw / 2).toFixed(1)}" y="${(it.pct == null ? H - bottom - 6 : y - 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${it.pct == null ? 'rgba(255,255,255,.3)' : '#fff'}" font-weight="600">${esc(it.text)}</text>
-          <text x="${(x + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="${it.current ? '#FF2A3D' : 'rgba(255,255,255,.45)'}">${esc(it.label)}</text>`;
+          <text x="${(x + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="${it.labelColor || (it.current ? '#FF2A3D' : 'rgba(255,255,255,.45)')}">${esc(it.label)}</text>`;
       }).join('')}
     </svg>`;
+}
+
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/**
+ * Mapa de calor ao estilo GitHub: colunas = semanas (segunda a domingo), linhas = dias.
+ * @param days  lista de { date: 'AAAA-MM-DD', fill } a começar numa segunda-feira (fill = cor ou null)
+ */
+export function heatmap(days, { cell = 5.4, gap = 1 } = {}) {
+  const weeks = Math.ceil(days.length / 7);
+  const step = cell + gap;
+  const top = 12;
+  const width = weeks * step;
+  const H = top + 7 * step;
+  let labels = '';
+  let lastMonth = -1;
+  const rects = days.map((d, i) => {
+    const col = Math.floor(i / 7), row = i % 7;
+    const m = Number(d.date.slice(5, 7)) - 1;
+    if (row === 0 && m !== lastMonth && Number(d.date.slice(8)) <= 7) {
+      labels += `<text x="${(col * step).toFixed(1)}" y="8" font-size="8" fill="rgba(255,255,255,.4)">${MONTHS[m]}</text>`;
+      lastMonth = m;
+    }
+    return d.fill ? `<rect x="${(col * step).toFixed(1)}" y="${(top + row * step).toFixed(1)}" width="${cell}" height="${cell}" rx="1.4" fill="${d.fill}"/>` : '';
+  }).join('');
+  return `<svg class="chart heatmap" viewBox="0 0 ${width.toFixed(1)} ${H.toFixed(1)}" width="100%" role="img" aria-label="Mapa do ano">${labels}${rects}</svg>`;
+}
+
+/** Cor do mapa para um nível 0–1 (null = vazio). */
+export function heatFill(v) {
+  if (v == null) return 'rgba(255,255,255,.035)';
+  if (v <= 0) return '#1d1d20';
+  return `rgba(255,42,61,${(0.28 + 0.72 * Math.min(1, v)).toFixed(2)})`;
 }

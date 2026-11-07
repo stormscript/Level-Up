@@ -10,7 +10,7 @@ import { openGoalSheet } from './goalSheet.js';
 import { habitsListHTML } from './habits.js';
 import { openHabitForm } from './habitForm.js';
 import { openHabitSheet } from './habitSheet.js';
-import { toggleCheck } from '../state.js';
+import { toggleCheck, addQty } from '../state.js';
 import { glow, play, toast } from '../ui/effects.js';
 import { todayList } from '../engine/habits.js';
 import { closingLine } from '../engine/phrases.js';
@@ -87,12 +87,13 @@ export function createGoals(section) {
   let habitWeek = currentPeriod('semana', todayKey());
 
   section.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-seg],[data-action],[data-goal],[data-htoggle],[data-hopen],[data-hweek],[data-obj]');
+    const t = e.target.closest('[data-seg],[data-action],[data-goal],[data-htoggle],[data-hplus],[data-hopen],[data-hweek],[data-obj]');
     if (!t) return;
     if (t.dataset.obj) return openObjectiveSheet(t.dataset.obj);
     if (t.dataset.seg) { tab = t.dataset.seg; return render(); }
     if (t.dataset.goal) return openGoalSheet(t.dataset.goal);
     if (t.dataset.htoggle) return toggleHabit(t);
+    if (t.dataset.hplus) return plusHabit(t);
     if (t.dataset.hopen) return openHabitSheet(t.dataset.hopen);
     if (t.dataset.hweek) {
       const n = Number(t.dataset.hweek);
@@ -116,15 +117,30 @@ export function createGoals(section) {
     if (a === 'now') { month = currentPeriod('mes', todayKey()); week = currentPeriod('semana', todayKey()); return render(); }
   });
 
+  async function plusHabit(btn) {
+    const h = state.habits.find((x) => x.id === btn.dataset.hplus);
+    if (!h) return;
+    const today = todayKey();
+    btn.classList.add('pop');
+    const before = todayList(state.habits, state.idx, today).find((i) => i.habit.id === h.id)?.done;
+    const res = await addQty(h.id, today, Number(h.quantidade?.passo) || 1);
+    play('check');
+    if (res.done && !before) {
+      const list = todayList(state.habits, state.idx, today);
+      if (list.length && list.every((i) => i.done)) { glow(); play('closed'); toast(closingLine(today), { long: true }); }
+      else toast(`${h.nome}: alvo atingido ✦`);
+    }
+  }
+
   async function toggleHabit(btn) {
     if (btn.disabled) return;
     const today = todayKey();
-    const wasDone = btn.classList.contains('on') || btn.classList.contains('done');
-    btn.classList.toggle(btn.classList.contains('hcheck') ? 'on' : 'done', !wasDone);
     btn.classList.add('pop');
     const res = await toggleCheck(btn.dataset.htoggle, btn.dataset.date);
     play(res.done ? 'check' : 'undo');
-    if (res.done && btn.dataset.date === today) {
+    if (res.state === 'slip') toast('Acontece. O que conta é o próximo dia limpo.');
+    if (res.state === 'min') toast('Mínimo feito. Conta para a sequência ✦');
+    if (res.done && res.state !== 'min' && btn.dataset.date === today) {
       const list = todayList(state.habits, state.idx, today);
       if (list.length && list.every((i) => i.done)) { glow(); play('closed'); toast(closingLine(today), { long: true }); }
       else if (res.streak && [7, 14, 21, 30, 50, 100, 365].includes(res.streak.value) && res.streak.unit !== 'semanas') toast(`${res.streak.value} dias. não quebres a corrente.`, { icon: '✦' });

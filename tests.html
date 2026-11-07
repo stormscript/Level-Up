@@ -22,7 +22,7 @@
 
   <script type="module">
     import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting, shortDate, longDate } from './js/engine/dates.js';
-    import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1, dayState, totalDone, todaySummary, bestActive } from './js/engine/habits.js';
+    import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1, dayState, totalDone, todaySummary, bestActive, atRisk, avoidList, qtyOn, weekdayRates, weakestDay, monthRates, dayScore, isPaused } from './js/engine/habits.js';
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
     import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth } from './js/engine/money.js';
     import { periodRange, progress, shiftPeriod, currentPeriod, goalsFor, featuredWeekly, weekLabel } from './js/engine/goals.js';
@@ -391,6 +391,69 @@
       const G2 = (periodo, done) => ({ tipo: 'mes', periodo, medida: 'feito', feito: done });
       const h = history([G2('2026-10', true), G2('2026-10', false), G2('2026-11', true)], 'mes', ['2026-09', '2026-10', '2026-11'], {});
       eq(h.map((x) => [x.total, x.done, x.pct]), [[0, 0, null], [2, 1, 0.5], [1, 1, 1]]);
+    });
+
+    group('Hábitos 2.0');
+    const CK = (habitId, data, extra = {}) => ({ habitId, data, ...extra });
+    const IX = (list) => makeIndex(list);
+    test('Quantidade: feito só ao atingir o alvo; parcial no meio', () => {
+      const h = H('agua', undefined, { quantidade: { alvo: 8, unidade: 'copos', passo: 1 } });
+      const idx = IX([CK('agua', '2026-11-04', { valor: 8 }), CK('agua', THU, { valor: 3 })]);
+      eq(dayState(h, idx, '2026-11-04', THU), 'done'); eq(dayState(h, idx, THU, THU), 'partial'); eq(qtyOn(idx, h, THU), 3);
+      eq(todayList([h], idx, THU)[0].done, false); eq(todayList([h], idx, THU)[0].qty, 3);
+      eq(totalDone(h, [CK('agua', 'a', { valor: 8 }), CK('agua', 'b', { valor: 2 })]), 1);
+    });
+    test('Versão mínima conta como feito (estado "min")', () => {
+      const h = H('ler', undefined, { minimo: '1 página' });
+      const idx = IX([CK('ler', '2026-11-03'), CK('ler', '2026-11-04', { min: true })]);
+      eq(dayState(h, idx, '2026-11-04', THU), 'min'); eq(streak(h, idx, THU).value, 2);
+      ok(todayList([h], IX([CK('ler', THU, { min: true })]), THU)[0].min);
+    });
+    test('Nunca falhar duas vezes: uma falha isolada não quebra, duas sim', () => {
+      const tol = H('t', undefined, { tolerancia: true, criadaEm: '2026-10-25' });
+      // feito 30, 31, (falha 1/11), 2, 3, 4 → com tolerância: 5 dias
+      const idx = IX(['2026-10-30', '2026-10-31', '2026-11-02', '2026-11-03', '2026-11-04'].map((d) => CK('t', d)));
+      eq(streak(tol, idx, THU).value, 5); eq(streak({ ...tol, tolerancia: false }, idx, THU).value, 3);
+      // duas falhas seguidas (1 e 2/11) quebram
+      const idx2 = IX(['2026-10-30', '2026-10-31', '2026-11-03', '2026-11-04'].map((d) => CK('t', d)));
+      eq(streak(tol, idx2, THU).value, 2);
+      eq(bestStreak(tol, idx, THU), 5);
+    });
+    test('Em risco: falhou o último dia e hoje ainda não fez', () => {
+      const tol = H('t', undefined, { tolerancia: true });
+      ok(atRisk(tol, IX([CK('t', '2026-11-03')]), THU));
+      ok(!atRisk(tol, IX([CK('t', '2026-11-04')]), THU));
+      ok(!atRisk({ ...tol, tolerancia: false }, IX([CK('t', '2026-11-03')]), THU));
+    });
+    test('Hábito a evitar: dias limpos desde o último deslize', () => {
+      const h = H('redes', undefined, { tipo: 'evitar', criadaEm: '2026-10-20' });
+      const idx = IX([CK('redes', '2026-10-28', { deslize: true })]);
+      eq(streak(h, idx, THU).value, 8); // 29/10 → 5/11
+      eq(dayState(h, idx, '2026-10-28', THU), 'slip'); eq(dayState(h, idx, THU, THU), 'clean');
+      eq(bestStreak(h, idx, THU), 8); eq(rate(h, idx, THU, 10), 0.9);
+      eq(todayList([h], idx, THU).length, 0); eq(avoidList([h], THU).length, 1);
+    });
+    test('Pausa: dias em pausa não contam nem quebram', () => {
+      const h = H('p', undefined, { pausas: [{ de: '2026-11-01', ate: '2026-11-03' }] });
+      const idx = IX(['2026-10-30', '2026-10-31', '2026-11-04'].map((d) => CK('p', d)));
+      ok(isPaused(h, '2026-11-02')); ok(!isScheduled(h, '2026-11-02'));
+      eq(streak(h, idx, THU).value, 3); eq(dayState(h, idx, '2026-11-02', THU), 'paused');
+      eq(todayList([{ ...h, pausas: [{ de: THU, ate: null }] }], idx, THU).length, 0);
+    });
+    test('Taxa por dia da semana e dia mais difícil', () => {
+      const h = H('d', undefined, { criadaEm: '2026-08-01' });
+      const days = []; for (let d = '2026-08-10'; d < THU; d = addDays(d, 1)) if (weekday(d) !== 5) days.push(CK('d', d));
+      const wr = weekdayRates(h, IX(days), THU);
+      eq(wr.find((x) => x.weekday === 5).pct, 0); eq(wr.find((x) => x.weekday === 1).pct, 1);
+      eq(weakestDay(wr).weekday, 5); eq(weakestDay(wr.map((x) => ({ ...x, pct: 1 }))), null);
+    });
+    test('Taxa por mês e consistência do dia', () => {
+      const h = H('m', undefined, { criadaEm: '2026-10-01' });
+      const idx = IX(Array.from({ length: 31 }, (_, i) => CK('m', `2026-10-${String(i + 1).padStart(2, '0')}`)).filter((_, i) => i % 2 === 0));
+      const mr = monthRates(h, idx, THU, 3);
+      eq(mr.map((x) => x.month), ['2026-09', '2026-10', '2026-11']); eq(mr[0].pct, null); eq(Math.round(mr[1].pct * 100), 52);
+      const a = H('a'), b = H('b');
+      eq(dayScore([a, b, H('c', undefined, { tipo: 'evitar' })], IX([CK('a', THU)]), THU), 0.5);
     });
 
     // ---------- Frases ----------

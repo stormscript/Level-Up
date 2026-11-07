@@ -23,11 +23,11 @@ export function buildSample(today) {
     id: uid(), nome, recorrencia, criadaEm: d(-27), ordem: ordem++, seed: true, _p: prob,
   });
   const habits = [
-    habit('10 000 passos', { tipo: 'diario' }, 0.85),
-    habit('Ler 20 páginas', { tipo: 'diario' }, 0.7),
-    habit('Sem açúcar', { tipo: 'diario' }, 0.65),
-    habit('Ginásio', { tipo: 'xPorSemana', n: 4 }, 0.62),
-    habit('Meditar 10 min', { tipo: 'dias', dias: [2, 4, 6] }, 0.8),
+    { ...habit('10 000 passos', { tipo: 'diario' }, 0.85), momento: '' },
+    { ...habit('Ler 20 páginas', { tipo: 'diario' }, 0.7), momento: 'noite', minimo: 'Ler 1 página', tolerancia: true },
+    { ...habit('Sem açúcar', { tipo: 'diario' }, 0.65), momento: '' },
+    { ...habit('Ginásio', { tipo: 'xPorSemana', n: 4 }, 0.62), momento: 'tarde', minimo: '10 flexões' },
+    { ...habit('Meditar 10 min', { tipo: 'dias', dias: [2, 4, 6] }, 0.8), momento: 'manha', tolerancia: true },
   ];
 
   const rand = rng(21);
@@ -63,7 +63,8 @@ export function buildSample(today) {
     },
   ];
 
-  return { habits, checks, journal, ...buildSampleExtras(today, habits) };
+  const h2 = buildSampleHabits2(today);
+  return { habits: [...habits, ...h2.habits], checks: [...checks, ...h2.checks], journal, ...buildSampleExtras(today, habits) };
 }
 
 /** Exemplos da Fase B: agenda, metas e finanças. */
@@ -181,4 +182,23 @@ export function buildSampleObjectives(today, goals = []) {
   const save = goals.find((g) => g.titulo === 'Poupar 300 €' && g.tipo === 'mes');
   const links = save ? [{ ...save, objetivoId: objs[0].id }] : [];
   return { objectives: objs, goalLinks: links };
+}
+
+/** Exemplos dos Hábitos 2.0: um hábito com quantidade e um a evitar (com histórico). */
+export function buildSampleHabits2(today, startOrder = 100) {
+  const d = (n) => addDays(today, n);
+  const rand = rng(7);
+  const water = { id: uid(), nome: 'Beber 2 L de água', recorrencia: { tipo: 'diario' }, criadaEm: d(-60), ordem: startOrder,
+    momento: '', quantidade: { alvo: 8, unidade: 'copos', passo: 1 }, minimo: '4 copos', tolerancia: true, seed: true };
+  const social = { id: uid(), nome: 'Sem redes sociais depois das 23h', tipo: 'evitar', recorrencia: { tipo: 'diario' },
+    criadaEm: d(-40), ordem: startOrder + 1, seed: true };
+  const checks = [];
+  for (let i = 60; i >= 1; i--) {
+    const r = rand();
+    const valor = r > 0.85 ? Math.round(rand() * 4) + 2 : r > 0.12 ? 8 : 0;
+    if (valor) checks.push({ id: checkId(water.id, d(-i)), habitId: water.id, data: d(-i), ts: Date.now() - i * 86400000, valor, seed: true });
+  }
+  checks.push({ id: checkId(water.id, today), habitId: water.id, data: today, ts: Date.now(), valor: 3, seed: true });
+  for (const n of [-31, -18, -9]) checks.push({ id: checkId(social.id, d(n)), habitId: social.id, data: d(n), ts: Date.now() + n * 86400000, deslize: true, seed: true });
+  return { habits: [water, social], checks };
 }

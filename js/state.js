@@ -1,9 +1,9 @@
 // Estado da app em memória + gravação no IndexedDB.
 import * as db from './db.js';
 import { prefs, replacePrefs, setPref } from './prefs.js';
-import { buildSample, buildSampleExtras, buildSampleTodos, buildSampleObjectives, uid } from './seed.js';
-import { todayKey } from './engine/dates.js';
-import { checkId, makeIndex, migrateV1, streak } from './engine/habits.js';
+import { buildSample, buildSampleExtras, buildSampleTodos, buildSampleObjectives, buildSampleHabits2, uid } from './seed.js';
+import { todayKey, addDays } from './engine/dates.js';
+import { checkId, makeIndex, migrateV1, streak, dayState, isAvoid, isQty } from './engine/habits.js';
 import { nextDate } from './engine/todos.js';
 
 export const state = {
@@ -18,7 +18,7 @@ const emit = () => {
   listeners.forEach((fn) => fn(state));
 };
 
-const DATA_VERSION = 5;
+const DATA_VERSION = 6;
 const META = () => ({ id: 'app', criadoEm: new Date().toISOString(), versaoDados: DATA_VERSION });
 
 /** Contexto para calcular o progresso das metas. */
@@ -56,10 +56,21 @@ export async function load() {
           await db.putMany('events', x.events.filter((e) => e.contagem));
           await db.putMany('todos', buildSampleTodos(todayKey(), await db.getAll('goals')));
         }
-        const goals = await db.getAll('goals');
-        const ob = buildSampleObjectives(todayKey(), goals);
-        await db.putMany('objectives', ob.objectives);
-        await db.putMany('goals', ob.goalLinks);
+        if (ver < 5) {
+          const goals = await db.getAll('goals');
+          const ob = buildSampleObjectives(todayKey(), goals);
+          await db.putMany('objectives', ob.objectives);
+          await db.putMany('goals', ob.goalLinks);
+        }
+      }
+      if (ver < 6) {
+        // Hábitos 2.0: momentos do dia nos exemplos + um hábito com quantidade e um a evitar.
+        const extra = { 'Ler 20 páginas': { momento: 'noite', minimo: 'Ler 1 página', tolerancia: true },
+          'Ginásio': { momento: 'tarde', minimo: '10 flexões' }, 'Meditar 10 min': { momento: 'manha', tolerancia: true } };
+        await db.putMany('habits', habits.filter((h) => h.seed && extra[h.nome]).map((h) => ({ ...h, ...extra[h.nome] })));
+        const h2 = buildSampleHabits2(todayKey());
+        await db.putMany('habits', h2.habits);
+        await db.putMany('checks', h2.checks);
       }
     }
     await db.put('meta', { ...meta, versaoDados: DATA_VERSION });
@@ -122,15 +133,14 @@ export async function deleteHabit(id) {
   await removeFrom('habits', 'habits', id);
 }
 
-/** Marca/desmarca um hábito num dia. Devolve { done, streak }. */
-export async function toggleCheck(habitId, date = todayKey()) {
+/** Guarda (ou apaga, com `data = null`) a marcação de um hábito num dia. */
+async function writeCheck(habitId, date, data) {
   const id = checkId(habitId, date);
-  const exists = state.checks.some((c) => c.id === id);
-  if (exists) {
+  state.checks = state.checks.filter((c) => c.id !== id);
+  if (!data) {
     await db.remove('checks', id);
-    state.checks = state.checks.filter((c) => c.id !== id);
   } else {
-    const c = { id, habitId, data: date, ts: Date.now() };
+    const c = { id, habitId, data: date, ts: Date.now(), ...data };
     await db.put('checks', c);
     state.checks.push(c);
     // Marcar um dia antes da criação do hábito: o hábito passa a "começar" nesse dia.
@@ -142,8 +152,84 @@ export async function toggleCheck(habitId, date = todayKey()) {
     }
   }
   emit();
+}
+
+const result = (habitId, date) => {
   const h = state.habits.find((x) => x.id === habitId);
-  return { done: !exists, streak: h ? streak(h, state.idx, date) : null };
+  const st = h ? dayState(h, state.idx, date, date) : null;
+  return { done: st === 'done' || st === 'min', state: st, streak: h ? streak(h, state.idx, date) : null };
+};
+
+/**
+ * Toque normal num hábito, num dia:
+ * - normal: feito ↔ por fazer (com versão mínima: por fazer → feito → mínimo → por fazer)
+ * - com quantidade: por fazer/parcial → alvo atingido → por fazer
+ * - a evitar: limpo ↔ deslize
+ */
+export async function toggleCheck(habitId, date = todayKey()) {
+  const h = state.habits.find((x) => x.id === habitId);
+  if (!h) return null;
+  const c = state.checks.find((x) => x.id === checkId(habitId, date));
+  if (isAvoid(h)) await writeCheck(habitId, date, c ? null : { deslize: true });
+  else if (isQty(h)) {
+    const full = c && !c.min && (Number(c.valor) || 0) >= Number(h.quantidade.alvo);
+    if (full && h.minimo) await writeCheck(habitId, date, { min: true, valor: Number(c.valor) || 0 });
+    else if (full || c?.min) await writeCheck(habitId, date, null);
+    else await writeCheck(habitId, date, { valor: Number(h.quantidade.alvo) });
+  } else if (!c) await writeCheck(habitId, date, {});
+  else if (!c.min && h.minimo) await writeCheck(habitId, date, { min: true });
+  else await writeCheck(habitId, date, null);
+  return result(habitId, date);
+}
+
+/** Soma (ou tira) uma quantidade num dia. */
+export async function addQty(habitId, date, delta) {
+  const h = state.habits.find((x) => x.id === habitId);
+  if (!h) return null;
+  const c = state.checks.find((x) => x.id === checkId(habitId, date));
+  const valor = Math.max(0, Math.round(((Number(c?.valor) || 0) + delta) * 100) / 100);
+  await writeCheck(habitId, date, valor > 0 ? { valor } : null);
+  return result(habitId, date);
+}
+
+/** Define a quantidade de um dia (0 apaga). */
+export async function setQty(habitId, date, valor) {
+  await writeCheck(habitId, date, valor > 0 ? { valor } : null);
+  return result(habitId, date);
+}
+
+/** Marca "fiz o mínimo" (ou desmarca). */
+export async function setMin(habitId, date, on) {
+  const c = state.checks.find((x) => x.id === checkId(habitId, date));
+  await writeCheck(habitId, date, on ? { ...(c ? { valor: c.valor } : {}), min: true } : null);
+  return result(habitId, date);
+}
+
+/** Pausar / retomar um hábito (os dias em pausa não contam nem quebram a sequência). */
+export async function setPaused(habitId, on, today = todayKey()) {
+  const h = state.habits.find((x) => x.id === habitId);
+  if (!h) return;
+  const pausas = [...(h.pausas || [])];
+  const open = pausas.find((p) => !p.ate);
+  if (on && !open) pausas.push({ de: today, ate: null });
+  if (!on && open) {
+    if (open.de >= today) pausas.splice(pausas.indexOf(open), 1);
+    else open.ate = addDays(today, -1);
+  }
+  await saveHabit({ ...h, pausas });
+}
+
+/** Muda a ordem de um hábito (−1 sobe, +1 desce). */
+export async function moveHabit(habitId, dir) {
+  const list = [...state.habits];
+  const i = list.findIndex((h) => h.id === habitId);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  const updated = list.map((h, k) => ({ ...h, ordem: k }));
+  await db.putMany('habits', updated);
+  state.habits = updated;
+  emit();
 }
 
 // ---------- Diário ----------

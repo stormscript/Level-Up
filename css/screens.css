@@ -1260,3 +1260,90 @@ textarea.notes {
 .chart-legend { flex-wrap: wrap; row-gap: 4px; }
 .chart-legend > span { white-space: nowrap; }
 .chart-legend .fc { white-space: normal; text-align: right; flex: 1 1 140px; }
+
+/* ---------- Hábitos 2.0 ---------- */
+.white { color: #fff; }
+/* anel de quantidade (+1) */
+.qring {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: conic-gradient(var(--accent) calc(var(--p, 0) * 1%), #26262a 0);
+  transition: transform 0.15s;
+}
+.qring > span {
+  width: 27px; height: 27px; border-radius: 50%;
+  background: var(--bg-elev); display: grid; place-items: center;
+  font-size: 11px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;
+}
+.check.qplus:active .qring, .hcheck.qty:active .qring { transform: scale(0.88); }
+.check.qplus.pop .qring, .hcheck.qty.pop .qring { animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.hcheck.qty .qring { width: 38px; height: 38px; }
+.hcheck.qty .qring > span { width: 30px; height: 30px; }
+.hcheck.qty.on .qring > span { background: var(--accent); }
+/* versão mínima */
+.ring.min, .hcheck.min .ring { background: rgba(255, 42, 61, 0.45) !important; border-color: var(--accent) !important; box-shadow: none !important; font-size: 13px; font-weight: 800; color: #fff; }
+.hcheck.min .ring .ck { stroke-dashoffset: 0; }
+.habit-row.is-min .task-title { color: #fff !important; }
+/* hábitos a evitar */
+.hcheck.avoid .ring { border-color: rgba(255, 42, 61, 0.5); }
+.hcheck.avoid.on .ring { background: rgba(255, 42, 61, 0.5); border-color: transparent; box-shadow: none; }
+.hcheck.avoid.slip .ring { background: #fff; color: #000; border-color: #fff; font-weight: 800; }
+.habit-card.paused { opacity: 0.5; }
+.habit-card.is-avoid.done { border-color: var(--line); }
+/* estados dos dias */
+.hday.min { background: rgba(255, 42, 61, 0.45); }
+.hday.min i { color: #fff; }
+.hday.partial { background: linear-gradient(0deg, rgba(255, 42, 61, 0.35) 45%, #18181b 45%); }
+.hday.clean { background: rgba(255, 42, 61, 0.28); }
+.hday.clean i { color: #fff; }
+.hday.slip { background: #fff; }
+.hday.slip i, .hday.slip span { color: #000; }
+.hday.paused { background: transparent; opacity: 0.3; }
+.hc-day.min { background: rgba(255, 42, 61, 0.45); }
+.hc-day.partial { background: linear-gradient(0deg, rgba(255, 42, 61, 0.4) 45%, #18181b 45%); }
+.hc-day.clean { background: rgba(255, 42, 61, 0.28); }
+.hc-day.slip { background: #fff; color: #000; }
+.hc-day.paused { background: transparent; color: var(--label3); opacity: 0.4; }
+/* controlo de hoje na ficha */
+.today-ctl { padding: 0 16px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.today-ctl .big-toggle { width: 100%; margin: 0; }
+.btn-secondary.warn { color: #000; background: #fff; }
+.qty-card { margin: 16px 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--sheet-cell); }
+.qty-card.done { border-color: rgba(255, 42, 61, 0.4); }
+.qty-top { display: flex; justify-content: space-between; align-items: center; }
+.pill-min { font-size: 12px; color: var(--accent); }
+.qty-value { margin: 6px 0 10px; }
+.qty-value b { font-size: 44px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.qty-value span { font-size: 16px; color: var(--label2); margin-left: 6px; }
+.qty-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-top: 14px; }
+.qty-btn { min-height: 54px; border: 1px solid var(--line); border-radius: 16px; background: #222225; color: #fff; font-size: 20px; font-weight: 700; transition: transform 0.1s; }
+.qty-btn.plus { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(255, 42, 61, 0.4); }
+.qty-btn:active { transform: scale(0.96); }
+.row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* sugestões */
+.tpl-row { display: flex; gap: 8px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+.tpl-row::-webkit-scrollbar { display: none; }
+.tpl { flex: none; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 20px; background: var(--sheet-cell); font-size: 14px; white-space: nowrap; }
+.tpl.on { border-color: var(--accent); background: var(--accent-soft); color: #fff; }
+/* evitar no Hoje */
+.avoid-row { min-height: 64px; gap: 10px; }
+.avoid-body { flex: 1; min-width: 0; border: 0; background: none; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.avoid-body b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avoid-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--label2); }
+.avoid-count b { font-size: 20px; font-weight: 800; line-height: 1; }
+.avoid-count.hot b { color: var(--accent); }
+.avoid-count span { font-size: 10px; }
+.slip-btn { color: var(--label2); }
+/* consistência e legendas */
+.consistency { margin-top: 12px; }
+.cons-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.cons-top b { font-size: 20px; font-weight: 800; color: var(--accent); margin-left: auto; }
+.heatmap { margin-top: 2px; }
+.lg { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 4px 0 8px; vertical-align: -1px; }
+.lg:first-child { margin-left: 0; }
+.lg.done { background: var(--accent); }
+.lg.min { background: rgba(255, 42, 61, 0.45); }
+.lg.miss { background: #1d1d20; border: 1px solid #333; }
+.lg.clean { background: rgba(255, 42, 61, 0.5); }
+.lg.slip { background: #fff; }
+.sec .muted.small { text-transform: none; letter-spacing: 0; }

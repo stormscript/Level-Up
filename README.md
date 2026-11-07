@@ -3,7 +3,7 @@
 Hábitos, metas, agenda e diário — em preto, branco e vermelho. ✦
 Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no teu telemóvel.
 
-**Versão 0.5.0 — Fase D**: Hoje · Agenda (eventos + tarefas) · Metas (mês, semana, hábitos) · Finanças · Diário. Com planear amanhã, contagens decrescentes, avisos ao abrir e **Objetivos** de longo prazo com gráfico de ritmo.
+**Versão 0.6.0 — Hábitos 2.0**: Hoje · Agenda (eventos + tarefas) · Metas (mês, semana, hábitos) · Finanças · Diário. Com planear amanhã, contagens decrescentes, avisos ao abrir e **Objetivos** de longo prazo com gráfico de ritmo.
 
 ---
 
@@ -49,7 +49,7 @@ Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no
 1. Substitui os ficheiros alterados no GitHub (**Add file → Upload files**, arrasta-os e faz **Commit**). Ficheiros com o mesmo nome são substituídos.
 2. **Importante:** abre o `service-worker.js` no GitHub (ícone do lápis ✏️) e muda o número da versão:
    ```js
-   const CACHE_VERSION = 'levelup-v0.5.0';   // → 'levelup-v0.5.1'
+   const CACHE_VERSION = 'levelup-v0.6.0';   // → 'levelup-v0.6.1'
    ```
    Sem este passo, o iPhone continua a mostrar a versão antiga (está guardada em cache para funcionar offline).
 3. Se criares um ficheiro novo, acrescenta-o à lista `ASSETS` nesse mesmo ficheiro.

@@ -1,7 +1,7 @@
 // Ecrã principal: "Hoje".
-import { state, toggleCheck, journalOn } from '../state.js';
+import { state, toggleCheck, journalOn, addQty } from '../state.js';
 import { prefs, setPref } from '../prefs.js';
-import { todayList, streak, frequencyLabel } from '../engine/habits.js';
+import { todayList, streak, frequencyLabel, atRisk, avoidList, dayState, MOMENTOS } from '../engine/habits.js';
 import { todayKey, capsDate, greeting } from '../engine/dates.js';
 import { closingLine, journalPrompt } from '../engine/phrases.js';
 import { createScreen } from '../ui/screen.js';
@@ -36,26 +36,64 @@ const goTab = (tab) => window.dispatchEvent(new CustomEvent('goto-tab', { detail
 
 const MILESTONES = [7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
 
+const fmtN = (n) => new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 }).format(n);
+
 /** Linha de hábito com gestos (usada no Hoje). */
-export function habitRow({ habit, done, week }, today) {
+export function habitRow({ habit, done, week, min, qty }, today) {
   const s = streak(habit, state.idx, today);
-  const meta = week ? `${week.count}/${week.n} esta semana` : frequencyLabel(habit);
+  const risk = atRisk(habit, state.idx, today);
+  let meta = week ? `${week.count}/${week.n} esta semana` : frequencyLabel(habit);
+  if (qty != null) meta = `${fmtN(qty)}/${fmtN(habit.quantidade.alvo)} ${habit.quantidade.unidade || ''}`.trim();
+  if (min) meta = `Mínimo feito · ${meta}`;
+  const step = Number(habit.quantidade?.passo) || 1;
+  const pct = qty != null ? Math.min(1, qty / Number(habit.quantidade.alvo)) : 0;
+  const check = qty != null && !done
+    ? `<button type="button" class="check qplus" data-qplus="${esc(habit.id)}" aria-label="Somar ${fmtN(step)}" style="--p:${(pct * 100).toFixed(0)}"><span class="qring"><span>+${fmtN(step)}</span></span></button>`
+    : `<button type="button" class="check" aria-label="${done ? 'Mudar' : 'Marcar'} ${esc(habit.nome)}"><span class="ring ${min ? 'min' : ''}">${min ? '½' : ICONS.check}</span></button>`;
   return `
-    <div class="swipe-row habit-row ${done ? 'done' : ''}" data-id="${esc(habit.id)}">
+    <div class="swipe-row habit-row ${done ? 'done' : ''} ${min ? 'is-min' : ''}" data-id="${esc(habit.id)}">
       <div class="swipe-under">${done ? 'Desmarcar' : 'Feito'}</div>
       <div class="swipe-actions">
         <button type="button" class="sa-edit" data-swipe="edit">Editar</button>
         <button type="button" class="sa-delete" data-swipe="delete">Apagar</button>
       </div>
       <div class="swipe-content task">
-        <button type="button" class="check" aria-label="${done ? 'Desmarcar' : 'Marcar'} ${esc(habit.nome)}"><span class="ring">${ICONS.check}</span></button>
+        ${check}
         <div class="task-body">
           <div class="task-title">${esc(habit.nome)}</div>
-          <div class="task-meta">${esc(meta)}</div>
+          <div class="task-meta">${risk ? '<span class="late">Hoje não pode falhar · </span>' : ''}${esc(meta)}</div>
         </div>
         ${s.value ? `<span class="streak ${done ? 'hot' : ''}">${s.value} ${s.unit}</span>` : ''}
       </div>
     </div>`;
+}
+
+/** Hábitos de hoje agrupados por momento do dia (só mostra cabeçalhos se houver mais de um grupo). */
+function habitGroupsHTML(list, today) {
+  const order = ['manha', 'tarde', 'noite', ''];
+  const groups = order.map((k) => ({ k, items: list.filter((i) => (i.habit.momento || '') === k) })).filter((g) => g.items.length);
+  if (groups.length <= 1) return `<div class="group list">${list.map((i) => habitRow(i, today)).join('')}</div>`;
+  return groups.map((g) => {
+    const doneN = g.items.filter((i) => i.done).length;
+    return `<div class="sub-sec"><span>${esc(MOMENTOS[g.k])}${g.k ? '' : ''} · ${doneN}/${g.items.length}</span></div>
+      <div class="group list">${g.items.map((i) => habitRow(i, today)).join('')}</div>`;
+  }).join('');
+}
+
+/** Hábitos a evitar: dias limpos + botão de deslize. */
+function avoidHTML(today) {
+  const list = avoidList(state.habits, today);
+  if (!list.length) return '';
+  return `<div class="sec"><span class="caps">A evitar</span></div>
+    <div class="group">${list.map((h) => {
+      const s = streak(h, state.idx, today);
+      const slipped = dayState(h, state.idx, today, today) === 'slip';
+      return `<div class="cell avoid-row">
+        <button type="button" class="avoid-body" data-hopen="${esc(h.id)}"><b>${esc(h.nome)}</b><span class="${slipped ? 'late' : 'muted'} small">${slipped ? 'Deslize hoje' : 'Hoje limpo até agora'}</span></button>
+        <span class="avoid-count ${s.value ? 'hot' : ''}"><b>${s.value}</b><span>${s.value === 1 ? 'dia limpo' : 'dias limpo'}</span></span>
+        <button type="button" class="pill-btn ${slipped ? '' : 'slip-btn'}" data-slip="${esc(h.id)}">${slipped ? 'Desfazer' : 'Escorreguei'}</button>
+      </div>`;
+    }).join('')}</div>`;
 }
 
 export function createToday(section) {
@@ -96,6 +134,12 @@ export function createToday(section) {
       setPref('bannerInstalarFechado', true);
       return render();
     }
+    const qp = e.target.closest('[data-qplus]');
+    if (qp) return plusQty(qp);
+    const slipBtn = e.target.closest('[data-slip]');
+    if (slipBtn) return slip(slipBtn.dataset.slip);
+    const ho = e.target.closest('[data-hopen]');
+    if (ho) return openHabitSheet(ho.dataset.hopen);
     const check = e.target.closest('.habit-row .check');
     if (check) return toggle(check.closest('.swipe-row'));
     const row = e.target.closest('.habit-row');
@@ -136,6 +180,22 @@ export function createToday(section) {
     if (kind === 'finance') return goTab('finance');
     if (kind === 'backup') return openSettings();
     if (kind === 'overdue') return slot('qa').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function plusQty(btn) {
+    const h = state.habits.find((x) => x.id === btn.dataset.qplus);
+    if (!h) return;
+    holdUntil = performance.now() + 500;
+    btn.classList.add('pop');
+    const res = await addQty(h.id, todayKey(), Number(h.quantidade?.passo) || 1);
+    play('check');
+    if (res?.done) { toast(`${h.nome}: alvo atingido ✦`); checkClosed(); }
+    schedule();
+  }
+
+  async function slip(id) {
+    const res = await toggleCheck(id, todayKey());
+    if (res?.state === 'slip') toast('Acontece. O que conta é o próximo dia limpo.');
   }
 
   async function toggle(row) {
@@ -262,8 +322,9 @@ export function createToday(section) {
 
       <div class="sec"><span class="caps">Hábitos</span></div>
       ${list.length
-        ? `<div class="group list">${list.map((i) => habitRow(i, today)).join('')}</div>`
+        ? habitGroupsHTML(list, today)
         : `<div class="empty small"><p>Nenhum hábito para hoje.</p></div>`}
+      ${avoidHTML(today)}
 
       <div class="sec"><span class="caps">Dinheiro</span><button type="button" class="sec-link" data-action="goto" data-tab="finance">Finanças</button></div>
       <button type="button" class="card money-card" data-action="goto" data-tab="finance">
