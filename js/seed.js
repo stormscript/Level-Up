@@ -121,7 +121,9 @@ export function buildSampleExtras(today, habits = []) {
     tx('despesa', 1450, 'comida', 0, 'Almoço com a Inês'),
   ].filter(Boolean);
 
-  return { events, goals, transactions, todos: buildSampleTodos(today, goals) };
+  const ob = buildSampleObjectives(today, goals);
+  for (const l of ob.goalLinks) Object.assign(goals.find((g) => g.id === l.id), { objetivoId: l.objetivoId });
+  return { events, goals, transactions, todos: buildSampleTodos(today, goals), objectives: ob.objectives };
 }
 
 /** Exemplos da Fase C: tarefas. */
@@ -148,4 +150,35 @@ export function buildSampleTodos(today, goals = []) {
 function weekdayOf(key) {
   const w = new Date(`${key}T12:00:00`).getDay();
   return w === 0 ? 7 : w;
+}
+
+/** Exemplos da Fase D: objetivos de longo prazo. */
+export function buildSampleObjectives(today, goals = []) {
+  const d = (n) => addDays(today, n);
+  let ordem = 0;
+  const o = (x) => ({ id: uid(), ordem: ordem++, registos: [], marcos: [], seed: true, ...x });
+  const objs = [
+    o({ emoji: '💰', titulo: 'Juntar 3 000 € para o carro', porque: 'Para ir para a faculdade sem depender de ninguém.',
+      tipo: 'poupanca', inicial: 860, alvo: 3000, unidade: '€', inicio: d(-75), prazo: d(235),
+      marcos: [{ id: uid(), valor: 1000 }, { id: uid(), valor: 2000 }, { id: uid(), valor: 3000, titulo: 'Carro ✦' }] }),
+    o({ emoji: '⚖️', titulo: 'Chegar aos 75 kg', porque: 'Sentir-me leve e com energia no verão.',
+      tipo: 'medicao', inicial: 80, alvo: 75, unidade: 'kg', inicio: d(-42), prazo: d(113),
+      registos: [[-35, 79.6], [-28, 79.4], [-21, 78.9], [-14, 78.8], [-7, 78.4], [-1, 78.2]].map(([n, v]) => ({ id: uid(), data: d(n), valor: v })),
+      marcos: [{ id: uid(), valor: 78 }, { id: uid(), valor: 76.5 }, { id: uid(), valor: 75 }] }),
+    o({ emoji: '🏃', titulo: 'Correr 10 km em menos de 50 min', porque: 'Provar a mim próprio que consigo.',
+      tipo: 'medicao', inicial: 57.5, alvo: 49.9, unidade: 'min', inicio: d(-30), prazo: d(144),
+      registos: [[-23, 56.8], [-16, 55.9], [-9, 55.2], [-2, 54.2]].map(([n, v]) => ({ id: uid(), data: d(n), valor: v })),
+      marcos: [{ id: uid(), valor: 55 }, { id: uid(), valor: 52 }, { id: uid(), valor: 49.9 }] }),
+    o({ emoji: '🚗', titulo: 'Tirar a carta de condução', porque: 'Liberdade.', tipo: 'feito', inicio: d(-20), prazo: d(160),
+      marcos: [
+        { id: uid(), titulo: 'Inscrição na escola de condução', feito: true, feitoEm: d(-18) },
+        { id: uid(), titulo: 'Exame de código', feito: true, feitoEm: d(-4) },
+        { id: uid(), titulo: '20 aulas de condução', feito: false },
+        { id: uid(), titulo: 'Exame de condução', feito: false },
+      ] }),
+  ];
+  // Liga a meta do mês "Poupar 300 €" ao objetivo do carro.
+  const save = goals.find((g) => g.titulo === 'Poupar 300 €' && g.tipo === 'mes');
+  const links = save ? [{ ...save, objetivoId: objs[0].id }] : [];
+  return { objectives: objs, goalLinks: links };
 }

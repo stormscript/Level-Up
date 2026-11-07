@@ -80,3 +80,19 @@ export function greeting(date = new Date()) {
   if (h >= 13 && h < 20) return 'Boa tarde';
   return 'Boa noite';
 }
+
+/** "28 fev" ou "28 fev 2027" (com ano só se não for o ano de `today`). */
+export const MONTH_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+export function shortDate(key, today = todayKey()) {
+  const d = fromKey(key);
+  const base = `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+  return key.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${key.slice(0, 4)}`;
+}
+
+/** "28 de fevereiro" ou "28 de fevereiro de 2027". */
+export function longDate(key, today = todayKey()) {
+  const d = fromKey(key);
+  const opts = key.slice(0, 4) === today.slice(0, 4) ? { day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' };
+  return new Intl.DateTimeFormat('pt-PT', opts).format(d);
+}

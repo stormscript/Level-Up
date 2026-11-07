@@ -8,7 +8,7 @@ import { toast } from '../ui/effects.js';
 
 const periodName = (tipo, p) => (tipo === 'mes' ? monthLabel(`${p}-01`) : weekLabel(p));
 
-export function openGoalForm(existing = null, { tipo = 'mes', periodo = null, paiId = null, onSaved } = {}) {
+export function openGoalForm(existing = null, { tipo = 'mes', periodo = null, paiId = null, objetivoId = null, onSaved } = {}) {
   const today = todayKey();
   const f = {
     tipo: existing?.tipo || tipo,
@@ -71,6 +71,17 @@ export function openGoalForm(existing = null, { tipo = 'mes', periodo = null, pa
         </div>
       </div>
 
+      <div data-show-tipo="mes" data-objs>
+        <div class="group-header">Faz parte do objetivo</div>
+        <div class="group">
+          <label class="cell"><span class="cell-label">Objetivo</span>
+            <select name="objetivoId" class="select-right">
+              <option value="">Nenhum</option>
+              ${state.objectives.filter((o) => !o.feito).map((o) => `<option value="${esc(o.id)}" ${o.id === (existing?.objetivoId || objetivoId) ? 'selected' : ''}>${esc(`${o.emoji || ''} ${o.titulo}`.trim())}</option>`).join('')}
+            </select></label>
+        </div>
+      </div>
+
       <div data-show-tipo="semana">
         <div class="group-header">Faz parte de</div>
         <div class="group">
@@ -104,6 +115,7 @@ export function openGoalForm(existing = null, { tipo = 'mes', periodo = null, pa
     form.querySelectorAll('[data-show-medida]').forEach((s) => (s.hidden = s.dataset.showMedida !== f.medida));
     form.querySelectorAll('[data-show-modo]').forEach((s) => (s.hidden = s.dataset.showModo !== f.modo));
     form.querySelectorAll('[data-show-tipo]').forEach((s) => (s.hidden = s.dataset.showTipo !== f.tipo));
+    if (!state.objectives.length) form.querySelector('[data-objs]').hidden = true;
     form.querySelector('[data-mode-help]').textContent = HELP[f.modo];
     form.querySelector('[data-unit]').hidden = f.modo === 'poupanca';
     // Metas do mês onde cai a semana
@@ -152,6 +164,7 @@ export function openGoalForm(existing = null, { tipo = 'mes', periodo = null, pa
       modo: f.medida === 'numero' ? f.modo : 'manual',
       habitId: f.modo === 'habito' ? f.habitId : null,
       paiId: f.tipo === 'semana' ? f.paiId || null : null,
+      objetivoId: f.tipo === 'mes' ? form.elements.objetivoId.value || null : null,
     };
     delete g.seed;
     const saved = await saveGoal(g);

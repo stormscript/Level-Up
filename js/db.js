@@ -2,7 +2,7 @@
 import { migrateV1 } from './engine/habits.js';
 
 const DB_NAME = 'levelup';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 // Stores atuais.
 export const STORES = {
@@ -13,6 +13,7 @@ export const STORES = {
   goals: 'id',
   transactions: 'id',
   todos: 'id', // tarefas ("tasks" era o nome de uma store antiga)
+  objectives: 'id', // objetivos de longo prazo
   meta: 'id',
 };
 

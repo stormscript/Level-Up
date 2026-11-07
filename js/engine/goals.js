@@ -72,3 +72,15 @@ export function featuredWeekly(goals, today, ctx) {
   if (!list.length) return null;
   return list.find((g) => !progress(g, ctx).done) || list[0];
 }
+
+/**
+ * Histórico: quantas metas de cada período foram cumpridas.
+ * @param periods lista de períodos ("2026-11" ou segundas "2026-11-02")
+ */
+export function history(goals, tipo, periods, ctx) {
+  return periods.map((periodo) => {
+    const list = goalsFor(goals, tipo, periodo);
+    const done = list.filter((g) => progress(g, ctx).done).length;
+    return { periodo, total: list.length, done, pct: list.length ? done / list.length : null };
+  });
+}

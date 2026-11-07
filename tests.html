@@ -21,7 +21,7 @@
   <div id="out"></div>
 
   <script type="module">
-    import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting } from './js/engine/dates.js';
+    import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting, shortDate, longDate } from './js/engine/dates.js';
     import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1, dayState, totalDone, todaySummary, bestActive } from './js/engine/habits.js';
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
     import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth } from './js/engine/money.js';
@@ -30,6 +30,8 @@
     import { parseQuick } from './js/engine/parse.js';
     import { nextOccurrence, countdowns } from './js/engine/agenda.js';
     import { nudges } from './js/engine/nudges.js';
+    import { series, objProgress, pace, milestones, suggestMilestones, direction, sortObjectives } from './js/engine/objectives.js';
+    import { history } from './js/engine/goals.js';
     import { trigger, journalPrompt, closingLine, hash, TRIGGERS, JOURNAL_PROMPTS } from './js/engine/phrases.js';
 
     const groups = [];
@@ -57,6 +59,10 @@
     test('A semana começa à segunda', () => { eq(weekStart('2026-11-08'), '2026-11-02'); eq(weekStart('2026-11-02'), '2026-11-02'); });
     test('Semana ISO', () => { eq(weekKey(THU), '2026-W45'); eq(weekKey('2026-01-01'), '2026-W01'); eq(weekKey('2024-12-30'), '2025-W01'); });
     test('Mês, diferença de dias e etiqueta', () => { eq(monthKey(THU), '2026-11'); eq(daysBetween('2026-11-01', THU), 4); eq(capsDate(THU), 'quinta · 5 de novembro'); });
+    test('Datas curtas e longas (ano só quando é outro ano)', () => {
+      eq(shortDate('2026-11-05', THU), '5 nov'); eq(shortDate('2027-02-28', THU), '28 fev 2027');
+      eq(longDate('2026-11-21', THU), '21 de novembro'); ok(longDate('2027-03-02', THU).includes('2027'));
+    });
     test('Saudação por hora', () => {
       eq(greeting(new Date(2026, 10, 5, 8)), 'Bom dia'); eq(greeting(new Date(2026, 10, 5, 15)), 'Boa tarde');
       eq(greeting(new Date(2026, 10, 5, 22)), 'Boa noite'); eq(greeting(new Date(2026, 10, 5, 3)), 'Boa noite');
@@ -322,6 +328,69 @@
       eq(todaySummary([a, b], idx, THU), { total: 2, done: 1 });
       eq(totalDone(a, [{ habitId: 'a' }, { habitId: 'a' }, { habitId: 'b' }]), 2);
       eq(bestActive([a, b], idx, THU).habit.id, 'a'); eq(bestActive([b], new Set(), THU), null);
+    });
+
+    // ---------- Objetivos ----------
+    group('Objetivos (longo prazo)');
+    const OB = (x) => ({ id: 'o', titulo: 'o', registos: [], marcos: [], inicio: '2026-11-01', prazo: '2026-12-31', ...x }); // 60 dias
+    test('Acumular: soma registos + metas ligadas com a mesma unidade', () => {
+      const o = OB({ tipo: 'acumular', alvo: 12, unidade: 'livros', registos: [{ data: '2026-11-02', valor: 2 }] });
+      const goals = [
+        { objetivoId: 'o', medida: 'numero', modo: 'manual', unidade: 'livros', registos: [{ data: '2026-11-04', valor: 1 }] },
+        { objetivoId: 'o', medida: 'numero', modo: 'manual', unidade: 'páginas', registos: [{ data: '2026-11-04', valor: 100 }] },
+      ];
+      const p = objProgress(o, { goals }, THU);
+      eq([p.value, p.target, p.done], [3, 12, false]); eq(p.pct, 0.25);
+    });
+    test('Poupança: valor inicial + receitas − despesas desde o início', () => {
+      const o = OB({ tipo: 'poupanca', inicial: 500, alvo: 1000, unidade: '€' });
+      const txs = [T('receita', 30000, 'x', '2026-11-02'), T('despesa', 5000, 'x', '2026-11-03'), T('receita', 99900, 'x', '2026-10-30')];
+      eq(objProgress(o, { txs }, THU).value, 750);
+      eq(series(o, { txs }, THU).map((p) => p.v), [500, 800, 750, 750, 750]);
+    });
+    test('Medição a descer (peso): direção, progresso e cumprido', () => {
+      const o = OB({ tipo: 'medicao', inicial: 80, alvo: 75, registos: [{ data: '2026-11-03', valor: 78 }] });
+      eq(direction(o), -1);
+      const p = objProgress(o, {}, THU); eq([p.value, p.pct], [78, 0.4]);
+      ok(objProgress({ ...o, registos: [{ data: THU, valor: 74.8 }] }, {}, THU).done);
+    });
+    test('Ritmo: esperado hoje, à frente/atrás e quanto falta por dia', () => {
+      // 60 dias, 4 passados (1→5 nov), objetivo 600 → esperado 40
+      const o = OB({ tipo: 'acumular', alvo: 600, registos: [{ data: '2026-11-02', valor: 50 }] });
+      const p = pace(o, {}, THU);
+      eq([p.elapsed, p.daysLeft, p.expected, p.diff, p.ahead], [4, 56, 40, 10, true]);
+      eq(p.remaining, 550); eq(p.perDay, 9.82); eq(p.perWeek, 68.75);
+      const q = pace({ ...o, registos: [{ data: '2026-11-02', valor: 10 }] }, {}, THU);
+      ok(!q.ahead); eq(q.diff, -30);
+    });
+    test('Previsão: só depois de 1 semana e se estiver a andar no sentido certo', () => {
+      const o = OB({ tipo: 'acumular', alvo: 100, registos: [{ data: '2026-11-02', valor: 20 }] });
+      eq(pace(o, {}, THU).forecast, null); // só 4 dias
+      eq(pace(o, {}, '2026-11-11').forecast, '2026-12-21'); // 20 em 10 dias → faltam 80 a 2/dia = 40 dias
+      eq(pace(OB({ tipo: 'medicao', inicial: 80, alvo: 75, registos: [{ data: '2026-11-09', valor: 81 }] }), {}, '2026-11-11').forecast, null);
+    });
+    test('Atraso: prazo passou sem cumprir', () => ok(pace(OB({ tipo: 'acumular', alvo: 10, prazo: '2026-11-03' }), {}, THU).late));
+    test('Marcos atingidos com data (numéricos) e passos (sim/não)', () => {
+      const o = OB({ tipo: 'acumular', alvo: 10, registos: [{ data: '2026-11-02', valor: 3 }, { data: '2026-11-04', valor: 3 }],
+        marcos: [{ id: 'b', valor: 5 }, { id: 'a', valor: 2 }, { id: 'c', valor: 10 }] });
+      eq(milestones(o, {}, THU).map((m) => [m.id, m.reached, m.date]), [['a', true, '2026-11-02'], ['b', true, '2026-11-04'], ['c', false, null]]);
+      const f = OB({ tipo: 'feito', marcos: [{ id: 'x', titulo: 'Código', feito: true }, { id: 'y', titulo: 'Exame', feito: false }] });
+      eq(objProgress(f, {}, THU).pct, 0.5); eq(milestones(f, {}, THU).map((m) => m.reached), [true, false]);
+    });
+    test('Marcos sugeridos (25/50/75%)', () => {
+      eq(suggestMilestones({ tipo: 'poupanca', inicial: 0, alvo: 3000 }), [750, 1500, 2250]);
+      eq(suggestMilestones({ tipo: 'medicao', inicial: 80, alvo: 75 }), [79, 77.5, 76.5]);
+    });
+    test('Ordem: ativos por prazo, cumpridos no fim', () => {
+      const a = OB({ id: 'a', tipo: 'acumular', alvo: 1, prazo: '2027-03-01' });
+      const b = OB({ id: 'b', tipo: 'acumular', alvo: 1, prazo: '2026-12-01' });
+      const c = OB({ id: 'c', tipo: 'feito', feito: true, prazo: '2026-11-20' });
+      eq(sortObjectives([a, c, b], {}, THU).map((o) => o.id), ['b', 'a', 'c']);
+    });
+    test('Histórico de metas cumpridas por mês', () => {
+      const G2 = (periodo, done) => ({ tipo: 'mes', periodo, medida: 'feito', feito: done });
+      const h = history([G2('2026-10', true), G2('2026-10', false), G2('2026-11', true)], 'mes', ['2026-09', '2026-10', '2026-11'], {});
+      eq(h.map((x) => [x.total, x.done, x.pct]), [[0, 0, null], [2, 1, 0.5], [1, 1, 1]]);
     });
 
     // ---------- Frases ----------
