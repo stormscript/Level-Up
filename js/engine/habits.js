@@ -158,3 +158,37 @@ export function migrateV1(tasks = [], log = []) {
   }
   return { habits, checks };
 }
+
+/**
+ * Estado de um dia para um hábito (para a semana e o calendário):
+ * 'done' feito · 'miss' falhado · 'pending' hoje por fazer · 'off' não agendado
+ * 'future' ainda não chegou · 'before' antes de o hábito existir.
+ */
+export function dayState(h, idx, date, today) {
+  if (date > today) return 'future';
+  if (done(idx, h, date)) return 'done';
+  if (h.criadaEm && date < h.criadaEm) return 'before';
+  if (isWeekly(h)) return date === today ? 'pending' : 'off';
+  if (!isScheduled(h, date)) return 'off';
+  return date === today ? 'pending' : 'miss';
+}
+
+/** Total de vezes que o hábito foi feito. */
+export const totalDone = (h, checks) => checks.filter((c) => c.habitId === h.id).length;
+
+/** Resumo do dia: quantos hábitos agendados hoje e quantos feitos. */
+export function todaySummary(habits, idx, today) {
+  const list = todayList(habits, idx, today);
+  return { total: list.length, done: list.filter((i) => i.done).length };
+}
+
+/** O hábito com a maior sequência ativa (para destacar). */
+export function bestActive(habits, idx, today) {
+  let best = null;
+  for (const h of habits) {
+    if (h.arquivado) continue;
+    const s = streak(h, idx, today);
+    if (s.value > 0 && (!best || s.value > best.streak.value)) best = { habit: h, streak: s };
+  }
+  return best;
+}

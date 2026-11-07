@@ -22,7 +22,7 @@
 
   <script type="module">
     import { toKey, fromKey, addDays, weekday, weekStart, weekKey, monthKey, daysBetween, capsDate, greeting } from './js/engine/dates.js';
-    import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1 } from './js/engine/habits.js';
+    import { makeIndex, checkId, isScheduled, weekCount, todayList, streak, bestStreak, last7, rate, frequencyLabel, migrateV1, dayState, totalDone, todaySummary, bestActive } from './js/engine/habits.js';
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
     import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth } from './js/engine/money.js';
     import { periodRange, progress, shiftPeriod, currentPeriod, goalsFor, featuredWeekly, weekLabel } from './js/engine/goals.js';
@@ -303,6 +303,25 @@
     test('Avisos fechados hoje não voltam; máximo 2', () => {
       eq(N({ overdueCount: 1, dismissed: { atrasadas: THU } }), []);
       eq(nudges({ today: THU, hour: 21, overdueCount: 1, plannedTomorrow: false, journalToday: false, hasData: false, dismissed: {} }).length, 2);
+    });
+
+    group('Hábitos: estados dos dias');
+    test('Estado de cada dia (feito, falhado, hoje por fazer, folga, futuro, antes de existir)', () => {
+      const h = H('m', { tipo: 'dias', dias: [1, 3, 4] }, { criadaEm: '2026-11-02' }); // seg, qua, qui
+      const idx = idxOf([['m', '2026-11-02']]);
+      eq(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', THU, '2026-11-06'].map((d) => dayState(h, idx, d, THU)),
+        ['before', 'done', 'off', 'miss', 'pending', 'future']);
+    });
+    test('X por semana: dias sem marcação são folga, não falha', () => {
+      const h = H('g', { tipo: 'xPorSemana', n: 3 });
+      eq(dayState(h, new Set(), '2026-11-03', THU), 'off'); eq(dayState(h, new Set(), THU, THU), 'pending');
+    });
+    test('Resumo do dia, total e maior sequência ativa', () => {
+      const a = H('a'), b = H('b');
+      const idx = idxOf([...days('a', '2026-11-01', 5), ['b', '2026-11-04']]);
+      eq(todaySummary([a, b], idx, THU), { total: 2, done: 1 });
+      eq(totalDone(a, [{ habitId: 'a' }, { habitId: 'a' }, { habitId: 'b' }]), 2);
+      eq(bestActive([a, b], idx, THU).habit.id, 'a'); eq(bestActive([b], new Set(), THU), null);
     });
 
     // ---------- Frases ----------

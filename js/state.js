@@ -123,6 +123,13 @@ export async function toggleCheck(habitId, date = todayKey()) {
     const c = { id, habitId, data: date, ts: Date.now() };
     await db.put('checks', c);
     state.checks.push(c);
+    // Marcar um dia antes da criação do hábito: o hábito passa a "começar" nesse dia.
+    const hb = state.habits.find((x) => x.id === habitId);
+    if (hb && hb.criadaEm && date < hb.criadaEm) {
+      const nh = { ...hb, criadaEm: date };
+      await db.put('habits', nh);
+      Object.assign(hb, nh);
+    }
   }
   emit();
   const h = state.habits.find((x) => x.id === habitId);

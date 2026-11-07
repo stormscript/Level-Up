@@ -49,7 +49,7 @@ Uma web app (PWA) feita para o iPhone, que funciona offline e guarda tudo só no
 1. Substitui os ficheiros alterados no GitHub (**Add file → Upload files**, arrasta-os e faz **Commit**). Ficheiros com o mesmo nome são substituídos.
 2. **Importante:** abre o `service-worker.js` no GitHub (ícone do lápis ✏️) e muda o número da versão:
    ```js
-   const CACHE_VERSION = 'levelup-v0.4.0';   // → 'levelup-v0.4.1'
+   const CACHE_VERSION = 'levelup-v0.4.1';   // → 'levelup-v0.4.2'
    ```
    Sem este passo, o iPhone continua a mostrar a versão antiga (está guardada em cache para funcionar offline).
 3. Se criares um ficheiro novo, acrescenta-o à lista `ASSETS` nesse mesmo ficheiro.

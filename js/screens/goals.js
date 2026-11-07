@@ -9,6 +9,11 @@ import { openGoalForm } from './goalForm.js';
 import { openGoalSheet } from './goalSheet.js';
 import { habitsListHTML } from './habits.js';
 import { openHabitForm } from './habitForm.js';
+import { openHabitSheet } from './habitSheet.js';
+import { toggleCheck } from '../state.js';
+import { glow, play, toast } from '../ui/effects.js';
+import { todayList } from '../engine/habits.js';
+import { closingLine } from '../engine/phrases.js';
 
 /** Cartão de meta (usado também no Hoje). */
 export function goalCardHTML(g, { compact = false } = {}) {
@@ -38,13 +43,22 @@ export function createGoals(section) {
   let tab = 'mes';
   let month = currentPeriod('mes', todayKey());
   let week = currentPeriod('semana', todayKey());
+  let habitWeek = currentPeriod('semana', todayKey());
 
   section.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-seg],[data-action],[data-goal],[data-habit]');
+    const t = e.target.closest('[data-seg],[data-action],[data-goal],[data-htoggle],[data-hopen],[data-hweek]');
     if (!t) return;
     if (t.dataset.seg) { tab = t.dataset.seg; return render(); }
     if (t.dataset.goal) return openGoalSheet(t.dataset.goal);
-    if (t.dataset.habit) return openHabitForm(state.habits.find((h) => h.id === t.dataset.habit));
+    if (t.dataset.htoggle) return toggleHabit(t);
+    if (t.dataset.hopen) return openHabitSheet(t.dataset.hopen);
+    if (t.dataset.hweek) {
+      const n = Number(t.dataset.hweek);
+      const cur = currentPeriod('semana', todayKey());
+      habitWeek = n === 0 ? cur : shiftPeriod('semana', habitWeek, n);
+      if (habitWeek > cur) habitWeek = cur;
+      return render();
+    }
     const a = t.dataset.action;
     if (a === 'new') {
       if (tab === 'habitos') return openHabitForm();
@@ -58,6 +72,21 @@ export function createGoals(section) {
     }
     if (a === 'now') { month = currentPeriod('mes', todayKey()); week = currentPeriod('semana', todayKey()); return render(); }
   });
+
+  async function toggleHabit(btn) {
+    if (btn.disabled) return;
+    const today = todayKey();
+    const wasDone = btn.classList.contains('on') || btn.classList.contains('done');
+    btn.classList.toggle(btn.classList.contains('hcheck') ? 'on' : 'done', !wasDone);
+    btn.classList.add('pop');
+    const res = await toggleCheck(btn.dataset.htoggle, btn.dataset.date);
+    play(res.done ? 'check' : 'undo');
+    if (res.done && btn.dataset.date === today) {
+      const list = todayList(state.habits, state.idx, today);
+      if (list.length && list.every((i) => i.done)) { glow(); play('closed'); toast(closingLine(today), { long: true }); }
+      else if (res.streak && [7, 14, 21, 30, 50, 100, 365].includes(res.streak.value) && res.streak.unit !== 'semanas') toast(`${res.streak.value} dias. não quebres a corrente.`, { icon: '✦' });
+    }
+  }
 
   function periodNav(label, isCurrent) {
     return `
@@ -94,7 +123,7 @@ export function createGoals(section) {
 
     let body = '';
     if (tab === 'habitos') {
-      body = habitsListHTML();
+      body = habitsListHTML(habitWeek);
     } else {
       const periodo = tab === 'mes' ? month : week;
       const list = goalsFor(state.goals, tab, periodo);

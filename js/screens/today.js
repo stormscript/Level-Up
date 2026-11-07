@@ -11,6 +11,7 @@ import { toast, glow, play } from '../ui/effects.js';
 import { line, whisper } from '../ui/phrase.js';
 import { shouldShowInstallBanner } from '../ui/install.js';
 import { openHabitForm, confirmDeleteHabit } from './habitForm.js';
+import { openHabitSheet } from './habitSheet.js';
 import { openJournal, moodBars } from './journalForm.js';
 import { openSettings } from './settings.js';
 import { agendaListHTML } from './agenda.js';
@@ -100,7 +101,7 @@ export function createToday(section) {
     const row = e.target.closest('.habit-row');
     if (row) {
       const h = state.habits.find((x) => x.id === row.dataset.id);
-      if (h) openHabitForm(h);
+      if (h) openHabitSheet(h.id);
     }
   });
 
