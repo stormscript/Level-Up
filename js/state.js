@@ -1,7 +1,7 @@
 // Estado da app em memória + gravação no IndexedDB.
 import * as db from './db.js';
 import { prefs, replacePrefs, setPref } from './prefs.js';
-import { buildSample, buildSampleExtras, buildSampleTodos, buildSampleObjectives, buildSampleHabits2, uid } from './seed.js';
+import { uid } from './seed.js';
 import { todayKey, addDays } from './engine/dates.js';
 import { checkId, makeIndex, migrateV1, streak, dayState, isAvoid, isQty } from './engine/habits.js';
 import { nextDate } from './engine/todos.js';
@@ -18,7 +18,7 @@ const emit = () => {
   listeners.forEach((fn) => fn(state));
 };
 
-const DATA_VERSION = 6;
+const DATA_VERSION = 7;
 const META = () => ({ id: 'app', criadoEm: new Date().toISOString(), versaoDados: DATA_VERSION });
 
 /** Contexto para calcular o progresso das metas. */
@@ -27,56 +27,26 @@ export const goalCtx = () => ({ goals: state.goals, checks: state.checks, txs: s
 export async function load() {
   const meta = (await db.getAll('meta')).find((m) => m.id === 'app');
   if (!meta) {
-    // Primeira utilização: dados de exemplo.
-    const s = buildSample(todayKey());
-    await db.putMany('habits', s.habits);
-    await db.putMany('checks', s.checks);
-    await db.putMany('journal', s.journal);
-    await db.putMany('events', s.events);
-    await db.putMany('goals', s.goals);
-    await db.putMany('transactions', s.transactions);
-    await db.putMany('todos', s.todos);
-    await db.putMany('objectives', s.objectives);
+    // Primeira utilização: começa vazia.
     await db.put('meta', META());
   } else if ((meta.versaoDados || 1) < DATA_VERSION) {
-    // Vens de uma versão anterior: se ainda tens os exemplos, junta os exemplos novos.
-    const ver = meta.versaoDados || 1;
-    const habits = await db.getAll('habits');
-    if (habits.some((h) => h.seed)) {
-      const x = buildSampleExtras(todayKey(), habits);
-      if (ver < 3) {
-        await db.putMany('events', x.events);
-        await db.putMany('goals', x.goals);
-        await db.putMany('transactions', x.transactions);
-        await db.putMany('todos', x.todos);
-        await db.putMany('objectives', x.objectives);
-        await db.putMany('goals', x.goals);
-      } else {
-        if (ver < 4) {
-          await db.putMany('events', x.events.filter((e) => e.contagem));
-          await db.putMany('todos', buildSampleTodos(todayKey(), await db.getAll('goals')));
-        }
-        if (ver < 5) {
-          const goals = await db.getAll('goals');
-          const ob = buildSampleObjectives(todayKey(), goals);
-          await db.putMany('objectives', ob.objectives);
-          await db.putMany('goals', ob.goalLinks);
-        }
-      }
-      if (ver < 6) {
-        // Hábitos 2.0: momentos do dia nos exemplos + um hábito com quantidade e um a evitar.
-        const extra = { 'Ler 20 páginas': { momento: 'noite', minimo: 'Ler 1 página', tolerancia: true },
-          'Ginásio': { momento: 'tarde', minimo: '10 flexões' }, 'Meditar 10 min': { momento: 'manha', tolerancia: true } };
-        await db.putMany('habits', habits.filter((h) => h.seed && extra[h.nome]).map((h) => ({ ...h, ...extra[h.nome] })));
-        const h2 = buildSampleHabits2(todayKey());
-        await db.putMany('habits', h2.habits);
-        await db.putMany('checks', h2.checks);
-      }
-    }
+    // Versão 7: a app deixa de ter exemplos. Apaga os que ainda existam; o que criaste fica.
+    await removeSampleData();
     await db.put('meta', { ...meta, versaoDados: DATA_VERSION });
   }
   await reload();
   navigator.storage?.persist?.().catch(() => {});
+}
+
+/** Apaga tudo o que foi criado como exemplo (marcado com `seed`), em todas as listas. */
+async function removeSampleData() {
+  const seedHabits = new Set((await db.getAll('habits')).filter((h) => h.seed).map((h) => h.id));
+  for (const store of Object.keys(db.STORES)) {
+    if (store === 'meta') continue;
+    const rows = await db.getAll(store);
+    const ids = rows.filter((r) => r.seed || (store === 'checks' && seedHabits.has(r.habitId))).map((r) => r.id);
+    if (ids.length) await db.removeMany(store, ids);
+  }
 }
 
 async function reload() {
@@ -416,12 +386,7 @@ export const hasSampleData = () =>
   ['habits', 'checks', 'journal', 'events', 'goals', 'txs', 'todos', 'objectives'].some((k) => state[k].some((x) => x.seed));
 
 export async function clearSampleData() {
-  const seedHabits = new Set(state.habits.filter((h) => h.seed).map((h) => h.id));
-  await db.removeMany('habits', [...seedHabits]);
-  await db.removeMany('checks', state.checks.filter((c) => c.seed || seedHabits.has(c.habitId)).map((c) => c.id));
-  for (const [store, key] of [['journal', 'journal'], ['events', 'events'], ['goals', 'goals'], ['transactions', 'txs'], ['todos', 'todos'], ['objectives', 'objectives']]) {
-    await db.removeMany(store, state[key].filter((x) => x.seed).map((x) => x.id));
-  }
+  await removeSampleData();
   await reload();
 }
 

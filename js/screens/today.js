@@ -31,6 +31,7 @@ import { progress } from '../engine/goals.js';
 import { addDays } from '../engine/dates.js';
 import { quickAddHTML, bindQuickAdd, todoRowHTML, bindTodoRows, openTodoForm } from './todoUI.js';
 import { openPlanner, openInbox } from './planner.js';
+import { openObjectiveForm } from './objectiveForm.js';
 
 const goTab = (tab) => window.dispatchEvent(new CustomEvent('goto-tab', { detail: tab }));
 
@@ -118,6 +119,15 @@ export function createToday(section) {
     if (action === 'journal') return openJournal();
     if (action === 'goto') return goTab(e.target.closest('[data-action]').dataset.tab);
     if (action === 'plan') return openPlanner();
+    if (action === 'start') {
+      const k = e.target.closest('[data-action]').dataset.k;
+      if (k === 'nome') return openSettings();
+      if (k === 'habito') return openHabitForm();
+      if (k === 'objetivo') return openObjectiveForm();
+      if (k === 'evento') return openEventForm();
+      if (k === 'gasto') return openTxForm();
+      if (k === 'tarefa') return slot('qa').querySelector('input')?.focus();
+    }
     if (action === 'inbox') return openInbox();
     if (action === 'nudge') return runNudge(e.target.closest('[data-action]').dataset.nudge);
     if (action === 'dismiss-nudge') {
@@ -292,8 +302,25 @@ export function createToday(section) {
     if (tasks.length - tasksDone) left.push(`${tasks.length - tasksDone} ${tasks.length - tasksDone === 1 ? 'tarefa' : 'tarefas'}`);
     if (list.length - habitsDone) left.push(`${list.length - habitsDone} ${list.length - habitsDone === 1 ? 'hábito' : 'hábitos'}`);
 
+    const empty = ['habits', 'todos', 'events', 'goals', 'objectives', 'txs', 'journal'].every((k) => !state[k].length);
+    const starter = empty ? `
+      <div class="card starter">
+        <div class="caps small">Começa aqui ✦</div>
+        <p class="starter-lead">Página em branco. Constrói o teu sistema em 5 minutos:</p>
+        <div class="starter-grid">
+          ${prefs.nome ? '' : '<button type="button" class="starter-btn" data-action="start" data-k="nome"><b>1</b>O teu nome</button>'}
+          <button type="button" class="starter-btn" data-action="start" data-k="objetivo"><b>🎯</b>Um objetivo</button>
+          <button type="button" class="starter-btn" data-action="start" data-k="habito"><b>✓</b>Primeiro hábito</button>
+          <button type="button" class="starter-btn" data-action="start" data-k="tarefa"><b>☐</b>Tarefa de hoje</button>
+          <button type="button" class="starter-btn" data-action="start" data-k="evento"><b>📅</b>Evento na agenda</button>
+          <button type="button" class="starter-btn" data-action="start" data-k="gasto"><b>€</b>Primeiro gasto</button>
+        </div>
+        <p class="muted small">Este cartão desaparece quando criares a primeira coisa.</p>
+      </div>` : '';
+
     slot('a').innerHTML = `
       ${installBanner}
+      ${starter}
       ${nudgesHTML}
       ${cdHTML}
       <div class="card summary ${closed ? 'closed' : ''}">
@@ -301,7 +328,7 @@ export function createToday(section) {
         <div>
           <div class="caps small">O teu dia</div>
           <div class="summary-title">${closed ? 'Dia fechado ✦' : total ? `${left.join(' · ')} por fazer` : 'Dia livre'}</div>
-          <div class="muted">${closed ? 'O resto do dia é teu.' : 'Desliza → para concluir'}</div>
+          <div class="muted">${closed ? 'O resto do dia é teu.' : total ? 'Desliza → para concluir' : 'Adiciona uma tarefa ou um hábito.'}</div>
         </div>
       </div>
 
