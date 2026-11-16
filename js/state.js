@@ -50,6 +50,9 @@ async function removeSampleData() {
   }
 }
 
+/** Recarrega tudo da base de dados (ex.: depois de receber dados de outro dispositivo). */
+export const reloadFromDb = () => reload();
+
 async function reload() {
   const [habits, checks, journal, events, goals, txs, todos] = await Promise.all(
     ['habits', 'checks', 'journal', 'events', 'goals', 'transactions', 'todos'].map((s) => db.getAll(s)),

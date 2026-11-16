@@ -11,6 +11,7 @@ const DEFAULTS = {
   avisos: true, // avisos no topo do Hoje ao abrir a app
   avisosFechados: {}, // { idDoAviso: 'AAAA-MM-DD' } fechado nesse dia
   planeadoPara: null, // data do último "Planear amanhã"
+  prefsU: 0, // hora da última alteração das preferências que sincronizam
   ultimoBackup: null, // ISO string
   bannerInstalarFechado: false,
 };
@@ -36,9 +37,17 @@ function persist() {
   }
 }
 
+/** Preferências que acompanham a sincronização entre dispositivos. */
+export const SYNC_PREF_KEYS = ['nome', 'mostrarFrases', 'frases', 'orcamento', 'limites', 'avisos'];
+
 export function setPref(key, value) {
   prefs[key] = value;
   persist();
+  if (SYNC_PREF_KEYS.includes(key)) {
+    prefs.prefsU = Date.now();
+    persist();
+    window.dispatchEvent(new CustomEvent('levelup-prefs-sync'));
+  }
 }
 
 export function replacePrefs(obj) {

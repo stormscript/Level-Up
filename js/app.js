@@ -1,5 +1,6 @@
 // Arranque da app: ecrãs, tab bar, service worker.
-import { load, subscribe, refreshDaily } from './state.js';
+import { load, subscribe, refreshDaily, reloadFromDb } from './state.js';
+import { initSync } from './sync.js';
 import { todayKey } from './engine/dates.js';
 import { initKeyboardHandling } from './ui/sheet.js';
 import { closeOpenRow } from './ui/swipe.js';
@@ -73,9 +74,12 @@ async function registerServiceWorker() {
         if (nw.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(nw);
       });
     });
+    // Só recarrega quando é uma atualização (já havia um service worker a controlar a página).
+    // Na primeira visita, o service worker novo toma conta da página sem a recarregar.
+    const hadController = !!navigator.serviceWorker.controller;
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return;
+      if (reloading || !hadController) return;
       reloading = true;
       location.reload();
     });
@@ -121,6 +125,7 @@ async function start() {
     }
   });
   registerServiceWorker();
+  initSync({ reload: reloadFromDb });
 }
 
 start();

@@ -2,7 +2,7 @@
 //
 // ⚠️ SEMPRE QUE ALTERARES QUALQUER FICHEIRO DA APP, MUDA ESTE NÚMERO (ex.: v0.1.0 → v0.1.1).
 // É isso que avisa o iPhone de que há uma versão nova.
-const CACHE_VERSION = 'levelup-v0.8.0';
+const CACHE_VERSION = 'levelup-v0.9.0';
 
 // Todos os ficheiros da app. Se criares um ficheiro novo, acrescenta-o aqui.
 const ASSETS = [
@@ -23,6 +23,7 @@ const ASSETS = [
   './js/engine/objectives.js',
   './js/engine/parse.js',
   './js/engine/phrases.js',
+  './js/engine/sync.js',
   './js/engine/todos.js',
   './js/prefs.js',
   './js/screens/agenda.js',
@@ -41,11 +42,13 @@ const ASSETS = [
   './js/screens/objectiveSheet.js',
   './js/screens/planner.js',
   './js/screens/settings.js',
+  './js/screens/syncSheet.js',
   './js/screens/today.js',
   './js/screens/todoUI.js',
   './js/screens/txForm.js',
   './js/seed.js',
   './js/state.js',
+  './js/sync.js',
   './js/ui/charts.js',
   './js/ui/dom.js',
   './js/ui/effects.js',
@@ -85,6 +88,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.includes('/api/')) return; // sincronização: sempre à rede, nunca em cache
 
   if (req.mode === 'navigate') {
     event.respondWith(caches.match('./index.html').then((res) => res || fetch(req)));

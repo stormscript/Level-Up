@@ -5,8 +5,9 @@ import { openSheet, actionSheet } from '../ui/sheet.js';
 import { toast } from '../ui/effects.js';
 import { el, esc } from '../ui/dom.js';
 import { todayKey } from '../engine/dates.js';
+import { openSyncSheet, syncLabel } from './syncSheet.js';
 
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.9.0';
 
 export function openSettings() {
   const body = el(`<div class="form"></div>`);
@@ -15,6 +16,14 @@ export function openSettings() {
   function render() {
     const last = prefs.ultimoBackup ? new Date(prefs.ultimoBackup).toLocaleDateString('pt-PT') : 'nunca';
     body.innerHTML = `
+      <div class="group-header">Sincronização</div>
+      <div class="group">
+        <button type="button" class="cell cell-btn sync-cell" data-action="sync">
+          <span class="cell-label">iPhone ⇅ PC</span><span class="muted small">${esc(syncLabel())}</span><span class="chev-r">›</span>
+        </button>
+      </div>
+      <p class="group-footer">Mantém todos os teus dispositivos iguais, com encriptação de ponta a ponta.</p>
+
       <div class="group-header">Tu</div>
       <div class="group">
         <label class="cell"><span class="cell-label">Nome</span>
@@ -64,6 +73,7 @@ export function openSettings() {
 
   body.addEventListener('click', async (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
+    if (action === 'sync') return openSyncSheet();
     if (action === 'export') return doExport();
     if (action === 'import') return body.querySelector('[data-import]').click();
     if (action === 'clear-sample') {

@@ -32,6 +32,7 @@
     import { nudges } from './js/engine/nudges.js';
     import { series, objProgress, pace, milestones, suggestMilestones, direction, sortObjectives } from './js/engine/objectives.js';
     import { history } from './js/engine/goals.js';
+    import { mergeSync, makeSyncId, formatSyncId, parseSyncId } from './js/engine/sync.js';
     import { trigger, journalPrompt, closingLine, hash, TRIGGERS, JOURNAL_PROMPTS } from './js/engine/phrases.js';
 
     const groups = [];
@@ -491,6 +492,59 @@
       eq(mr.map((x) => x.month), ['2026-09', '2026-10', '2026-11']); eq(mr[0].pct, null); eq(Math.round(mr[1].pct * 100), 52);
       const a = H('a'), b = H('b');
       eq(dayScore([a, b, H('c', undefined, { tipo: 'evitar' })], IX([CK('a', THU)]), THU), 0.5);
+    });
+
+    group('Sincronização');
+    const NOW = 1_800_000_000_000;
+    const S = (stores, tombs = [], prefs = null) => ({ stores, tombs, prefs });
+    const ids = (m, name) => m.data.stores[name].map((r) => r.id).sort();
+    test('Primeira vez (nada no servidor): envia tudo, não muda nada localmente', () => {
+      const m = mergeSync(S({ todos: [{ id: 'a', _u: 1 }] }), null, NOW);
+      ok(m.needsPush); ok(!m.localChanged); eq(ids(m, 'todos'), ['a']);
+    });
+    test('Junta itens diferentes dos dois lados', () => {
+      const m = mergeSync(S({ todos: [{ id: 'a', _u: 5 }] }), S({ todos: [{ id: 'b', _u: 6 }] }), NOW);
+      eq(ids(m, 'todos'), ['a', 'b']); eq(m.put.todos.map((r) => r.id), ['b']); ok(m.localChanged); ok(m.needsPush);
+    });
+    test('Mesmo item: ganha a alteração mais recente', () => {
+      const m = mergeSync(S({ todos: [{ id: 'a', t: 'velho', _u: 5 }] }), S({ todos: [{ id: 'a', t: 'novo', _u: 9 }] }), NOW);
+      eq(m.data.stores.todos[0].t, 'novo'); eq(m.put.todos[0].t, 'novo'); ok(!m.needsPush);
+      const m2 = mergeSync(S({ todos: [{ id: 'a', t: 'meu', _u: 9 }] }), S({ todos: [{ id: 'a', t: 'dele', _u: 5 }] }), NOW);
+      eq(m2.data.stores.todos[0].t, 'meu'); ok(m2.needsPush); ok(!m2.localChanged);
+    });
+    test('Apagado num lado (lápide mais recente) desaparece no outro', () => {
+      const m = mergeSync(S({ todos: [{ id: 'a', _u: NOW - 5000 }] }), S({ todos: [] }, [{ id: 'todos|a', store: 'todos', rid: 'a', _u: NOW - 2000 }]), NOW);
+      eq(ids(m, 'todos'), []); eq(m.del.todos, ['a']); ok(m.localChanged);
+    });
+    test('Editado depois de apagado noutro lado: a edição ganha', () => {
+      const m = mergeSync(S({ todos: [{ id: 'a', _u: NOW - 1000 }] }), S({ todos: [] }, [{ id: 'todos|a', store: 'todos', rid: 'a', _u: NOW - 2000 }]), NOW);
+      eq(ids(m, 'todos'), ['a']); ok(m.needsPush);
+    });
+    test('Lápides antigas (> 180 dias) são esquecidas', () => {
+      const old = NOW - 200 * 86400000;
+      const m = mergeSync(S({}, [{ id: 'todos|x', store: 'todos', rid: 'x', _u: old }]), S({}), NOW);
+      eq(m.data.tombs.length, 0);
+    });
+    test('Tudo igual: nada a fazer', () => {
+      const a = S({ todos: [{ id: 'a', _u: 5 }] }, [{ id: 'todos|z', store: 'todos', rid: 'z', _u: NOW - 1000 }], { _u: 3, values: { nome: 'Fred' } });
+      const m = mergeSync(a, JSON.parse(JSON.stringify(a)), NOW);
+      ok(!m.needsPush); ok(!m.localChanged);
+    });
+    test('Preferências: ganha o bloco mais recente', () => {
+      const m = mergeSync(S({}, [], { _u: 3, values: { nome: 'A' } }), S({}, [], { _u: 7, values: { nome: 'B' } }), NOW);
+      eq(m.data.prefs.values.nome, 'B'); eq(m.prefs.values.nome, 'B'); ok(m.localChanged);
+      const m2 = mergeSync(S({}, [], { _u: 9, values: { nome: 'A' } }), S({}, [], { _u: 7, values: { nome: 'B' } }), NOW);
+      eq(m2.data.prefs.values.nome, 'A'); eq(m2.prefs, null); ok(m2.needsPush);
+    });
+    test('Registos antigos sem hora (_u) juntam-se sem perder nada', () => {
+      const m = mergeSync(S({ habits: [{ id: 'h1' }] }), S({ habits: [{ id: 'h2' }] }), NOW);
+      eq(ids(m, 'habits'), ['h1', 'h2']);
+    });
+    test('Código: 26 caracteres, formatado e lido com erros de escrita', () => {
+      const id = makeSyncId(new Uint8Array(16).fill(255)); eq(id.length, 26); ok(/^[A-Z2-7]+$/.test(id));
+      eq(makeSyncId(new Uint8Array(16)), 'A'.repeat(26));
+      const f = formatSyncId('ABCDEFGHIJKLMNOPQRSTUVWXYZ'); eq(f, 'ABCDE-FGHIJ-KLMNO-PQRST-UVWXYZ');
+      eq(parseSyncId(' abcde fghij-klmno pqrst uvwxyz '), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'); eq(parseSyncId('abc'), null);
     });
 
     // ---------- Frases ----------

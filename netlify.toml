@@ -3,6 +3,11 @@
   publish = "."
   command = ""
 
+# Função de sincronização (netlify/functions/sync.mjs → /api/sync)
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # O service worker nunca pode ficar em cache: é ele que traz as versões novas.
 [[headers]]
   for = "/service-worker.js"
@@ -14,3 +19,8 @@
   [headers.values]
     Content-Type = "application/manifest+json"
     Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"

@@ -1,0 +1,9 @@
+{
+  "name": "levelup",
+  "private": true,
+  "description": "LevelUp: PWA pessoal. Só a função de sincronização do Netlify usa dependências.",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.9"
+  }
+}
