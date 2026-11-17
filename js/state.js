@@ -4,7 +4,7 @@ import { prefs, replacePrefs, setPref } from './prefs.js';
 import { uid } from './seed.js';
 import { todayKey, addDays } from './engine/dates.js';
 import { checkId, makeIndex, migrateV1, streak, dayState, isAvoid, isQty } from './engine/habits.js';
-import { nextDate } from './engine/todos.js';
+import { nextDateAfter } from './engine/todos.js';
 import { dueRecurring, recurringDate } from './engine/money.js';
 
 export const state = {
@@ -350,7 +350,7 @@ export async function toggleTodo(id, today = todayKey()) {
   if (!t.feito) {
     next.feito = true;
     next.feitoEm = today;
-    const nd = t.repetir && t.repetir !== 'nunca' ? nextDate(t.data, t.repetir) : null;
+    const nd = t.repetir && t.repetir !== 'nunca' ? nextDateAfter(t.data, t.repetir, today) : null;
     if (nd && !t.proximaId) {
       const copy = await saveTodo({ ...t, id: null, data: nd, feito: false, feitoEm: null, proximaId: null, goalEntryId: null, seed: undefined,
         passos: (t.passos || []).map((p) => ({ ...p, feito: false })) });

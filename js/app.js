@@ -1,6 +1,7 @@
 // Arranque da app: ecrãs, tab bar, service worker.
 import { load, subscribe, refreshDaily, reloadFromDb } from './state.js';
 import { initSync } from './sync.js';
+import { handleLinkHash } from './screens/syncSheet.js';
 import { todayKey } from './engine/dates.js';
 import { initKeyboardHandling } from './ui/sheet.js';
 import { closeOpenRow } from './ui/swipe.js';
@@ -126,6 +127,8 @@ async function start() {
   });
   registerServiceWorker();
   initSync({ reload: reloadFromDb });
+  setTimeout(handleLinkHash, 600);
+  window.addEventListener('hashchange', handleLinkHash);
 }
 
 start();

@@ -23,6 +23,7 @@ export function parseQuick(text, today, base = today) {
   let data = base;
   let hora = '';
   let prioridade = false;
+  let repetir = 'nunca';
   const found = [];
 
   const take = (re, fn) => {
@@ -37,6 +38,17 @@ export function parseQuick(text, today, base = today) {
 
   // Importante: "!" no início ou no fim
   take(/(^\s*!+\s)|(\s!+\s*$)/, () => { prioridade = true; });
+
+  // Repetição: "todos os dias", "dias úteis", "todas as semanas", "todos os meses", "todas as segundas"
+  take(/\s(todos os dias|diariamente|todo o dia)\s/, () => { repetir = 'diario'; }) ||
+    take(/\s(dias uteis|dias de semana|nos dias uteis)\s/, () => { repetir = 'uteis'; }) ||
+    take(/\s(todas as semanas|semanalmente|toda a semana)\s/, () => { repetir = 'semanal'; }) ||
+    take(/\s(todos os meses|mensalmente|todo o mes)\s/, () => { repetir = 'mensal'; }) ||
+    take(/\s(?:todas as|todos os|todas|todos) (segundas|tercas|quartas|quintas|sextas|sabados|domingos)\s/, (m) => {
+      repetir = 'semanal';
+      const target = WEEKDAYS[m[1].replace(/s$/, '')];
+      data = addDays(today, (target - weekday(today) + 7) % 7); // hoje, se for esse dia
+    });
 
   // Datas
   take(/\s(depois de amanha)\s/, () => { data = addDays(today, 2); }) ||
@@ -68,10 +80,10 @@ export function parseQuick(text, today, base = today) {
     if (h < 24 && mi < 60) hora = `${pad(h)}:${pad(mi)}`;
   }) || take(/\s(?:as) (\d{1,2})\s/, (m) => { if (+m[1] < 24) hora = `${pad(+m[1])}:00`; });
 
-  if (hora && !data) data = today; // com hora, tem de ter dia
+  if ((hora || repetir !== 'nunca') && !data) data = today; // com hora ou repetição, tem de ter dia
   const titulo = s.replace(/\s+/g, ' ').trim();
   const cap = titulo ? titulo.charAt(0).toUpperCase() + titulo.slice(1) : '';
-  return { titulo: cap, data, hora, prioridade, found };
+  return { titulo: cap, data, hora, prioridade, repetir, found };
 }
 
 function isValid(key) {

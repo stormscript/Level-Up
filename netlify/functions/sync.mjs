@@ -12,7 +12,22 @@ async function sha256(text) {
 }
 
 export default async (req) => {
+  try {
+    return await handle(req);
+  } catch (e) {
+    // Mostra a causa na app (ex.: Netlify Blobs não disponível).
+    return json({ ok: false, error: 'servidor', detail: String(e?.message || e).slice(0, 200) }, 500);
+  }
+};
+
+async function handle(req) {
   const url = new URL(req.url);
+  if (url.searchParams.has('ping')) {
+    // Diagnóstico: confirma que a função e o armazenamento funcionam.
+    const store = getStore({ name: 'levelup-sync', consistency: 'strong' });
+    await store.get('__ping__');
+    return json({ ok: true, v: 2 });
+  }
   const id = url.searchParams.get('id') || '';
   const token = req.headers.get('x-sync-token') || '';
   if (!/^[A-Z2-7]{26}$/.test(id)) return json({ error: 'codigo' }, 400);
@@ -41,6 +56,6 @@ export default async (req) => {
   }
 
   return json({ error: 'metodo' }, 405);
-};
+}
 
 export const config = { path: '/api/sync' };

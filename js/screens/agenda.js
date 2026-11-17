@@ -8,7 +8,8 @@ import { esc, ICONS } from '../ui/dom.js';
 import { whisper } from '../ui/phrase.js';
 import { openEventForm } from './eventForm.js';
 import { todosOn, datesWithTodos, inbox } from '../engine/todos.js';
-import { quickAddHTML, bindQuickAdd, todoRowHTML, bindTodoRows } from './todoUI.js';
+import { quickAddHTML, bindQuickAdd, todoRowHTML, bindTodoRows, openTodoForm } from './todoUI.js';
+import { actionSheet } from '../ui/sheet.js';
 import { openInbox } from './planner.js';
 
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -71,7 +72,8 @@ export function createAgenda(section) {
       return;
     }
     const a = t.dataset.action;
-    if (a === 'new') return openEventForm(null, { date: selected });
+    if (a === 'new') return addMenu();
+    if (a === 'new-event') return openEventForm(null, { date: selected });
     if (a === 'inbox') return openInbox();
     if (a === 'today') { selected = todayKey(); month = selected.slice(0, 7); return render(); }
     if (a === 'prev-week') { selected = addDays(selected, -7); return render(); }
@@ -101,12 +103,21 @@ export function createAgenda(section) {
     render();
   });
 
+  async function addMenu() {
+    const c = await actionSheet({
+      title: `Adicionar · ${formatLong(selected)}`,
+      actions: [{ label: 'Tarefa (pode repetir)', value: 'todo' }, { label: 'Evento com hora', value: 'event' }],
+    });
+    if (c === 'todo') openTodoForm(null, { date: selected });
+    if (c === 'event') openEventForm(null, { date: selected });
+  }
+
   function weekStrip() {
     const start = weekStart(selected);
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
     const has = datesWithEvents(state.events, days);
-    const hasT = datesWithTodos(state.todos, days);
     const today = todayKey();
+    const hasT = datesWithTodos(state.todos, days, today);
     return `
       <div class="week-strip">
         <button type="button" class="strip-arrow" data-action="prev-week" aria-label="Semana anterior">‹</button>
@@ -125,8 +136,8 @@ export function createAgenda(section) {
     const total = lastDayOfMonth(month);
     const days = Array.from({ length: total }, (_, i) => `${month}-${pad(i + 1)}`);
     const has = datesWithEvents(state.events, days);
-    const hasT = datesWithTodos(state.todos, days);
     const today = todayKey();
+    const hasT = datesWithTodos(state.todos, days, today);
     return `
       <div class="month-nav">
         <button type="button" class="strip-arrow" data-action="prev-month" aria-label="Mês anterior">‹</button>
@@ -178,7 +189,7 @@ export function createAgenda(section) {
       <div class="sub-sec"><span>Tarefas${tasks.length ? ` · ${doneN}/${tasks.length}` : ''}</span></div>`;
     slot('list').innerHTML = `
       ${tasks.length ? `<div class="group list">${tasks.map((x) => todoRowHTML(x, today)).join('')}</div>` : ''}
-      <div class="sub-sec"><span>Eventos</span><button type="button" class="sec-link" data-action="new">+ Evento</button></div>
+      <div class="sub-sec"><span>Eventos</span><button type="button" class="sec-link" data-action="new-event">+ Evento</button></div>
       ${events ? `<div class="group ev-list">${events}</div>` : '<div class="empty small"><p>Nada marcado.</p></div>'}
       ${whisper('agenda-fim')}`;
     bindTodoRows(slot('list'));

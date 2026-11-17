@@ -26,7 +26,8 @@
     import { occursOn, eventsOn, duration, formatDuration, nowLineIndex, timeStates, toICS, toMin } from './js/engine/agenda.js';
     import { parseAmount, fmtEUR, summary, monthSummary, budgetPace, balanceBetween, spentOn, lastDayOfMonth, cumulativeByDay, projectMonth, monthsSeries, prevMonth, vsPrevMonth, categoryStatus, frequentTxs, dueRecurring, nextRecurring, recurringDate, recurringTotal } from './js/engine/money.js';
     import { periodRange, progress, shiftPeriod, currentPeriod, goalsFor, featuredWeekly, weekLabel } from './js/engine/goals.js';
-    import { todosOn, overdue, inbox, nextDate, prioritiesOn, stepsLabel } from './js/engine/todos.js';
+    import { todosOn, overdue, inbox, nextDate, prioritiesOn, stepsLabel, repeatsOn, nextDateAfter, datesWithTodos } from './js/engine/todos.js';
+    import { dayProgress, momentum, strongStreak, upNext } from './js/engine/day.js';
     import { parseQuick } from './js/engine/parse.js';
     import { nextOccurrence, countdowns } from './js/engine/agenda.js';
     import { nudges } from './js/engine/nudges.js';
@@ -302,6 +303,56 @@
     test('Prioridades do dia e passos', () => {
       eq(prioritiesOn([TD('a', THU, { prioridade: true }), TD('b', THU)], THU).map((t) => t.id), ['a']);
       eq(stepsLabel({ passos: [{ feito: true }, { feito: false }, { feito: false }] }), '1/3'); eq(stepsLabel({}), '');
+    });
+
+    group('Tarefas que se repetem');
+    test('Aparecem nos dias seguintes da agenda (não antes, não hoje em duplicado)', () => {
+      const t = TD('gin', THU, { repetir: 'semanal' });
+      ok(repeatsOn(t, '2026-11-12')); ok(!repeatsOn(t, '2026-11-13')); ok(!repeatsOn(t, THU)); ok(!repeatsOn(t, '2026-10-29'));
+      eq(todosOn([t], '2026-11-12', THU).map((x) => [x.todo.id, !!x.virtual]), [['gin', true]]);
+      eq(todosOn([t], THU, THU).length, 1); ok(!todosOn([t], THU, THU)[0].virtual);
+      ok(datesWithTodos([t], ['2026-11-12'], THU).has('2026-11-12'));
+      eq(todosOn([{ ...t, feito: true }], '2026-11-12', THU).length, 0);
+    });
+    test('Diário, dias úteis e mensal (dia 31 em meses curtos)', () => {
+      ok(repeatsOn(TD('a', THU, { repetir: 'diario' }), '2026-11-06'));
+      const u = TD('u', THU, { repetir: 'uteis' }); ok(repeatsOn(u, '2026-11-06')); ok(!repeatsOn(u, '2026-11-07')); ok(repeatsOn(u, '2026-11-09'));
+      const m = TD('m', '2026-01-31', { repetir: 'mensal' }); ok(repeatsOn(m, '2026-02-28')); ok(repeatsOn(m, '2026-03-31')); ok(!repeatsOn(m, '2026-03-30'));
+      eq(nextDate('2026-11-06', 'uteis'), '2026-11-09');
+    });
+    test('Ao concluir uma repetida atrasada, a próxima fica depois de hoje', () => {
+      eq(nextDateAfter('2026-10-01', 'semanal', THU), '2026-11-12'); eq(nextDateAfter(THU, 'diario', THU), '2026-11-06');
+    });
+    test('Escrita rápida com repetição', () => {
+      const R = (txt) => { const r = parseQuick(txt, THU, THU); return [r.titulo, r.data, r.repetir]; };
+      eq(R('beber água todos os dias'), ['Beber água', THU, 'diario']);
+      eq(R('ginásio todas as segundas 18h'), ['Ginásio', '2026-11-09', 'semanal']);
+      eq(R('reunião todas as quintas'), ['Reunião', THU, 'semanal']);
+      eq(R('responder emails dias úteis'), ['Responder emails', THU, 'uteis']);
+      eq(R('pagar renda todos os meses dia 1'), ['Pagar renda', '2026-12-01', 'mensal']);
+      eq(parseQuick('ver série', THU, THU).repetir, 'nunca');
+    });
+
+    group('Hoje: progresso do dia');
+    test('Progresso junta hábitos e tarefas', () => {
+      const h = [H('a'), H('b')];
+      const idx = idxOf([['a', THU]]);
+      const todos = [TD('t1', THU, { feito: true }), TD('t2', THU)];
+      eq(dayProgress(h, idx, todos, THU), { done: 2, total: 4, pct: 0.5 });
+      eq(dayProgress([], new Set(), [], THU), null);
+    });
+    test('Semana (momentum) e dias fortes seguidos', () => {
+      const h = [H('a', undefined, { criadaEm: '2026-10-25' })];
+      const idx = idxOf(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'].map((d) => ['a', d]));
+      const w = momentum(h, idx, [], THU); eq(w.length, 7); eq(w[6].date, THU); eq(w[5].pct, 1); eq(w[6].pct, 0);
+      eq(strongStreak(h, idx, [], THU), 4);
+      eq(strongStreak(h, idxOf([...['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'].map((d) => ['a', d]), ['a', THU]]), [], THU), 5);
+    });
+    test('A seguir: agora, próximo ou amanhã', () => {
+      const evs = [E('aula', THU, '10:00', '11:30'), E('gin', THU, '18:30', '19:30'), E('jantar', '2026-11-06', '20:00', '22:00')];
+      eq(upNext(evs, THU, toMin('10:30')).ev.id, 'aula'); eq(upNext(evs, THU, toMin('10:30')).state, 'now');
+      const n = upNext(evs, THU, toMin('17:45')); eq([n.ev.id, n.state, n.minutes], ['gin', 'next', 45]);
+      eq(upNext(evs, THU, toMin('21:00')).ev.id, 'jantar'); eq(upNext([], THU, 600), null);
     });
 
     group('Escrita rápida');

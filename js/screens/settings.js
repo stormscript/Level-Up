@@ -7,7 +7,7 @@ import { el, esc } from '../ui/dom.js';
 import { todayKey } from '../engine/dates.js';
 import { openSyncSheet, syncLabel } from './syncSheet.js';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.10.0';
 
 export function openSettings() {
   const body = el(`<div class="form"></div>`);

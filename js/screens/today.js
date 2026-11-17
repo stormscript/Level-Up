@@ -25,6 +25,9 @@ import { featuredWeekly } from '../engine/goals.js';
 import { spentOn, monthSummary, fmtEUR, categoryStatus, categoryById } from '../engine/money.js';
 import { actionSheet } from '../ui/sheet.js';
 import { todosOn } from '../engine/todos.js';
+import { momentum, strongStreak, upNext } from '../engine/day.js';
+import { eventsOn } from '../engine/agenda.js';
+import { weekday, WEEKDAY_LETTER } from '../engine/dates.js';
 import { countdowns } from '../engine/agenda.js';
 import { nudges } from '../engine/nudges.js';
 import { progress } from '../engine/goals.js';
@@ -253,7 +256,6 @@ export function createToday(section) {
     const j = journalOn(today);
     const weekGoal = featuredWeekly(state.goals, today, goalCtx());
     weekGoalId = weekGoal?.id || null;
-    const agenda = agendaListHTML(today, { limit: 4 });
     const spentToday = spentOn(state.txs, today);
     const month = monthSummary(state.txs, today.slice(0, 7));
     const cds = countdowns(state.events, today, 3);
@@ -302,10 +304,6 @@ export function createToday(section) {
           <em>${esc(c.ev.titulo)}</em>
         </button>`).join('')}</div>` : '';
 
-    const left = [];
-    if (tasks.length - tasksDone) left.push(`${tasks.length - tasksDone} ${tasks.length - tasksDone === 1 ? 'tarefa' : 'tarefas'}`);
-    if (list.length - habitsDone) left.push(`${list.length - habitsDone} ${list.length - habitsDone === 1 ? 'hábito' : 'hábitos'}`);
-
     const empty = ['habits', 'todos', 'events', 'goals', 'objectives', 'txs', 'journal'].every((k) => !state[k].length);
     const starter = empty ? `
       <div class="card starter">
@@ -322,69 +320,147 @@ export function createToday(section) {
         <p class="muted small">Este cartão desaparece quando criares a primeira coisa.</p>
       </div>` : '';
 
+    // ---- Cartão do dia ----
+    const week = momentum(state.habits, state.idx, state.todos, today);
+    const strong = strongStreak(state.habits, state.idx, state.todos, today);
+    const left = [];
+    if (tasks.length - tasksDone) left.push(`${tasks.length - tasksDone} ${tasks.length - tasksDone === 1 ? 'tarefa' : 'tarefas'}`);
+    if (list.length - habitsDone) left.push(`${list.length - habitsDone} ${list.length - habitsDone === 1 ? 'hábito' : 'hábitos'}`);
+    const hero = empty ? '' : `
+      <div class="card hero-day ${closed ? 'closed' : ''}">
+        <div class="hd-top">
+          <div class="hd-ring" style="--p:${pct}"><div><b>${total ? `${pct}%` : '—'}</b><span>${closed ? 'fechado' : 'do dia'}</span></div></div>
+          <div class="hd-stats">
+            <div class="hd-stat"><b>${tasksDone}<small>/${tasks.length}</small></b><span>tarefas</span></div>
+            <div class="hd-stat"><b>${habitsDone}<small>/${list.length}</small></b><span>hábitos</span></div>
+            <div class="hd-stat ${strong ? 'hot' : ''}"><b>✦ ${strong}</b><span>${strong === 1 ? 'dia forte' : 'dias fortes'}</span></div>
+          </div>
+        </div>
+        <div class="hd-week" aria-label="Últimos 7 dias">
+          ${week.map((w) => `<div class="hd-col ${w.date === today ? 'today' : ''}"><div class="hd-bar"><i style="height:${w.pct == null ? 0 : Math.max(6, Math.round(w.pct * 100))}%" class="${w.pct != null && w.pct >= 0.8 ? 'strong' : ''}"></i></div><span>${WEEKDAY_LETTER[weekday(w.date)]}</span></div>`).join('')}
+        </div>
+        <p class="hd-msg">${closed ? 'Dia fechado ✦ O resto é teu.' : total ? `Falta: ${left.join(' · ')}` : 'Nada marcado para hoje.'}</p>
+      </div>`;
+
+    // ---- A seguir ----
+    const nowD = new Date();
+    const nx = upNext(state.events, today, nowD.getHours() * 60 + nowD.getMinutes());
+    const moreToday = eventsOn(state.events, today).filter((e) => !nx || e.id !== nx.ev.id).length;
+    const fmtIn = (m) => (m < 60 ? `em ${m} min` : `em ${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}min` : ''}`);
+    const upNextHTML = nx ? `
+      <button type="button" class="card upnext ${nx.state}" data-ev="${esc(nx.ev.id)}" data-date="${nx.date}">
+        <span class="un-time"><b>${esc(nx.ev.inicio || 'Dia')}</b><small>${nx.state === 'now' ? 'agora' : nx.state === 'next' ? fmtIn(nx.minutes) : 'amanhã'}</small></span>
+        <span class="un-body"><span class="caps small">${nx.state === 'now' ? 'A decorrer' : nx.state === 'next' ? 'A seguir' : 'Amanhã'}</span><b>${esc(nx.ev.titulo)}</b>
+          <small>${esc([nx.ev.local, nx.ev.fim ? `até ${nx.ev.fim}` : ''].filter(Boolean).join(' · '))}${moreToday && nx.state !== 'tomorrow' ? ` · +${moreToday} hoje` : ''}</small></span>
+        <span class="chev">${ICONS.chevron}</span>
+      </button>` : '';
+
+    // ---- As 3 de hoje ----
+    const prios = tasks.filter((x) => x.todo.prioridade && !x.atrasada);
+    const rest = tasks.filter((x) => !(x.todo.prioridade && !x.atrasada));
+    const priosHTML = prios.length ? `
+      <div class="sec"><span class="caps">As 3 de hoje</span><span class="muted small">${prios.filter((x) => x.todo.feito).length}/${prios.length}</span></div>
+      <div class="group list prio-list">${prios.map((x) => todoRowHTML(x, today)).join('')}</div>` : '';
+
     slot('a').innerHTML = `
       ${installBanner}
       ${starter}
       ${nudgesHTML}
+      ${hero}
+      ${upNextHTML}
       ${cdHTML}
-      <div class="card summary ${closed ? 'closed' : ''}">
-        <div class="ring-progress" style="--p:${pct}"><span>${doneN}/${total}</span></div>
-        <div>
-          <div class="caps small">O teu dia</div>
-          <div class="summary-title">${closed ? 'Dia fechado ✦' : total ? `${left.join(' · ')} por fazer` : 'Dia livre'}</div>
-          <div class="muted">${closed ? 'O resto do dia é teu.' : total ? 'Desliza → para concluir' : 'Adiciona uma tarefa ou um hábito.'}</div>
-        </div>
-      </div>
+      ${priosHTML}
+      <div class="sec"><span class="caps">${prios.length ? 'Outras tarefas' : 'Tarefas'}${rest.length ? ` · ${rest.filter((x) => x.todo.feito).length}/${rest.length}` : ''}</span><button type="button" class="sec-link" data-action="inbox">Sem data</button></div>`;
 
-      <div class="sec"><span class="caps">Tarefas${tasks.length ? ` · ${tasksDone}/${tasks.length}` : ''}</span><button type="button" class="sec-link" data-action="inbox">Sem data</button></div>`;
+    // ---- Hábitos em mosaico ----
+    const order = { manha: 0, tarde: 1, noite: 2, '': 3 };
+    const tiles = [...list].sort((x, y) => (x.done - y.done) || ((order[x.habit.momento || ''] ?? 3) - (order[y.habit.momento || ''] ?? 3)));
+    const tileHTML = ({ habit: h, done, min, qty }) => {
+      const s = streak(h, state.idx, today);
+      const risk = atRisk(h, state.idx, today);
+      const isQ = qty != null;
+      const p = isQ ? Math.min(1, qty / Number(h.quantidade.alvo)) : done ? 1 : 0;
+      const mark = done ? (min ? '½' : '✓') : isQ ? `+${fmtN(Number(h.quantidade.passo) || 1)}` : '';
+      return `<button type="button" class="htile ${done ? 'done' : ''} ${min ? 'min' : ''} ${risk ? 'risk' : ''}" data-tile="${esc(h.id)}" style="--p:${Math.round(p * 100)}">
+        <span class="ht-ring"><i>${mark}</i></span>
+        <span class="ht-name">${esc(h.nome)}</span>
+        <span class="ht-meta">${risk ? 'não pode falhar' : isQ ? `${fmtN(qty)}/${fmtN(h.quantidade.alvo)} ${esc(h.quantidade.unidade || '')}` : h.momento ? esc(MOMENTOS[h.momento]) : ''}${s.value ? ` <em>✦${s.value}</em>` : ''}</span>
+      </button>`;
+    };
+
+    // ---- Dinheiro + Diário lado a lado ----
+    const budgetPct = prefs.orcamento ? Math.min(100, (month.despesas / prefs.orcamento) * 100) : null;
+    const duo = `
+      <div class="duo">
+        <button type="button" class="card mini" data-action="goto" data-tab="finance">
+          <span class="caps small">Gasto hoje</span>
+          <b class="mini-big">${esc(fmtEUR(spentToday))}</b>
+          <span class="muted small">mês: ${esc(fmtEUR(month.despesas, { round: true }))}${prefs.orcamento ? ` / ${esc(fmtEUR(prefs.orcamento, { round: true }))}` : ''}</span>
+          ${budgetPct != null ? `<span class="bar thin ${month.despesas > prefs.orcamento ? 'over' : ''}"><i style="width:${budgetPct.toFixed(1)}%"></i></span>` : ''}
+        </button>
+        <button type="button" class="card mini" data-action="journal">
+          <span class="caps small">Diário</span>
+          ${j ? `${moodBars(j.humor)}<span class="mini-text">${esc((j.texto || '').slice(0, 60)) || 'Escrito hoje ✦'}</span>`
+              : `<span class="jc-icon">${ICONS.pen}</span><span class="mini-text">${esc(journalPrompt(today))}</span>`}
+        </button>
+      </div>`;
 
     slot('b').innerHTML = `
-      ${tasks.length ? `<div class="group list">${tasks.map((x) => todoRowHTML(x, today)).join('')}</div>` : ''}
+      ${rest.length ? `<div class="group list">${rest.map((x) => todoRowHTML(x, today)).join('')}</div>` : ''}
 
       ${hour >= 18 && !planned ? `
         <button type="button" class="card plan-card" data-action="plan">
           <span class="plan-star">✦</span><div><strong>Planear amanhã</strong><span class="muted small">Escolhe as 3 que importam. 1 minuto.</span></div><span class="chev">${ICONS.chevron}</span>
         </button>` : ''}
 
-      ${weekGoal ? `<div class="sec"><span class="caps">Meta da semana</span><button type="button" class="sec-link" data-action="goto" data-tab="goals">Todas</button></div>${goalCardHTML(weekGoal, { compact: true })}` : ''}
-
-      <div class="sec"><span class="caps">Agenda</span><button type="button" class="sec-link" data-action="goto" data-tab="agenda">Ver tudo</button></div>
-      ${agenda ? `<div class="group ev-list">${agenda}</div>` : `<div class="empty small"><p>Nada marcado para hoje.</p></div>`}
-
-      <div class="sec"><span class="caps">Hábitos</span></div>
-      ${list.length
-        ? habitGroupsHTML(list, today)
-        : `<div class="empty small"><p>Nenhum hábito para hoje.</p></div>`}
+      ${list.length ? `
+        <div class="sec"><span class="caps">Hábitos · ${habitsDone}/${list.length}</span><button type="button" class="sec-link" data-action="goto" data-tab="goals">Todos</button></div>
+        <div class="habit-grid">${tiles.map(tileHTML).join('')}</div>
+        <p class="tile-hint">Toca para marcar · toque longo para detalhes</p>` : ''}
       ${avoidHTML(today)}
 
-      <div class="sec"><span class="caps">Dinheiro</span><button type="button" class="sec-link" data-action="goto" data-tab="finance">Finanças</button></div>
-      <button type="button" class="card money-card" data-action="goto" data-tab="finance">
-        <div><span class="caps small">Hoje</span><b>${esc(fmtEUR(spentToday))}</b></div>
-        <div><span class="caps small">Este mês</span><b>${esc(fmtEUR(month.despesas, { round: true }))}${prefs.orcamento ? `<small> / ${esc(fmtEUR(prefs.orcamento, { round: true }))}</small>` : ''}</b></div>
-        ${prefs.orcamento ? `<div class="bar thin ${month.despesas > prefs.orcamento ? 'over' : ''}"><i style="width:${Math.min(100, (month.despesas / prefs.orcamento) * 100).toFixed(1)}%"></i></div>` : ''}
-      </button>
+      ${duo}
 
-      <div class="sec"><span class="caps">Diário</span></div>
-      <button type="button" class="card journal-card" data-action="journal">
-        ${j
-          ? `<div class="jc-top">${moodBars(j.humor)}<span class="muted small">Escrito hoje</span></div>
-             <p class="jc-text">${esc((j.texto || '').slice(0, 140)) || '<span class="muted">Sem texto.</span>'}</p>`
-          : `<div class="jc-top"><span class="jc-icon">${ICONS.pen}</span><span class="muted small">Ainda em branco</span></div>
-             <p class="jc-prompt">${esc(journalPrompt(today))}</p>`}
-      </button>
+      ${weekGoal ? `<div class="sec"><span class="caps">Meta da semana</span><button type="button" class="sec-link" data-action="goto" data-tab="goals">Todas</button></div>${goalCardHTML(weekGoal, { compact: true })}` : ''}
 
       ${planned ? '<p class="group-footer center">Amanhã já está planeado ✦ <button type="button" class="link-btn inline" data-action="plan">rever</button></p>' : ''}
       ${whisper('hoje-fim')}`;
 
-    slot('b').querySelectorAll('.habit-row').forEach((row) => {
-      const h = state.habits.find((x) => x.id === row.dataset.id);
-      attachSwipe(row, {
-        onRight: () => toggle(row),
-        onEdit: () => openHabitForm(h),
-        onDelete: () => confirmDeleteHabit(h),
+    bindTiles(slot('b'));
+    bindTodoRows(slot('a'), { onToggled: (res) => { holdUntil = performance.now() + 600; if (res?.done) checkClosed(); } });
+    bindTodoRows(slot('b'), { onToggled: (res) => { holdUntil = performance.now() + 600; if (res?.done) checkClosed(); } });
+  }
+
+  // Mosaico de hábitos: toque = marcar (ou +1); toque longo = ficha do hábito.
+  function bindTiles(container) {
+    container.querySelectorAll('[data-tile]').forEach((tile) => {
+      let timer = null, long = false;
+      const start = () => { long = false; timer = setTimeout(() => { long = true; openHabitSheet(tile.dataset.tile); }, 480); };
+      const stop = () => clearTimeout(timer);
+      tile.addEventListener('pointerdown', start);
+      tile.addEventListener('pointerup', stop);
+      tile.addEventListener('pointerleave', stop);
+      tile.addEventListener('pointercancel', stop);
+      tile.addEventListener('contextmenu', (e) => e.preventDefault());
+      tile.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (long) return;
+        const h = state.habits.find((x) => x.id === tile.dataset.tile);
+        if (!h) return;
+        holdUntil = performance.now() + 550;
+        tile.classList.add('pop');
+        let res;
+        if (h.quantidade && !tile.classList.contains('done')) res = await addQty(h.id, todayKey(), Number(h.quantidade.passo) || 1);
+        else res = await toggleCheck(h.id, todayKey());
+        play(res?.done ? 'check' : 'undo');
+        if (res?.state === 'min') toast('Mínimo feito. Conta para a sequência ✦');
+        if (res?.done) {
+          if (res.streak && MILESTONES.includes(res.streak.value) && res.streak.unit !== 'semanas') toast(`${res.streak.value} dias. não quebres a corrente.`, { icon: '✦' });
+          checkClosed();
+        }
+        schedule();
       });
     });
-    bindTodoRows(slot('b'), { onToggled: (res) => { holdUntil = performance.now() + 600; if (res?.done) checkClosed(); } });
   }
 
   function checkClosed() {

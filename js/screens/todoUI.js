@@ -2,7 +2,7 @@
 import { state, saveTodo, deleteTodo, toggleTodo, moveTodo, toggleStep } from '../state.js';
 import { todayKey, addDays, formatRelative } from '../engine/dates.js';
 import { parseQuick } from '../engine/parse.js';
-import { stepsLabel } from '../engine/todos.js';
+import { stepsLabel, REPEAT_TODO } from '../engine/todos.js';
 import { progress } from '../engine/goals.js';
 import { esc, el, ICONS } from '../ui/dom.js';
 import { attachSwipe } from '../ui/swipe.js';
@@ -12,7 +12,19 @@ import { uid } from '../seed.js';
 
 // ---------- Linha ----------
 
-export function todoRowHTML({ todo: t, atrasada }, today = todayKey()) {
+export function todoRowHTML({ todo: t, atrasada, virtual }, today = todayKey()) {
+  if (virtual) {
+    return `
+    <div class="swipe-row todo-row virtual" data-todo="${esc(t.id)}" data-virtual="1">
+      <div class="swipe-content task">
+        <span class="check square static" aria-hidden="true"><span class="ring">↻</span></span>
+        <div class="task-body">
+          <div class="task-title">${t.prioridade ? '<span class="star-mini">✦</span>' : ''}${esc(t.titulo)}</div>
+          <div class="task-meta">${t.hora ? `${esc(t.hora)} · ` : ''}↻ ${esc((REPEAT_TODO[t.repetir] || '').toLowerCase())}</div>
+        </div>
+      </div>
+    </div>`;
+  }
   const meta = [];
   if (atrasada) meta.push(`<span class="late">${esc(formatRelative(t.data, today))}</span>`);
   if (t.hora) meta.push(esc(t.hora));
@@ -41,7 +53,10 @@ export function todoRowHTML({ todo: t, atrasada }, today = todayKey()) {
 
 /** Liga gestos e toques às linhas de tarefa dentro de `container`. */
 export function bindTodoRows(container, { onToggled } = {}) {
-  container.querySelectorAll('.todo-row').forEach((row) => {
+  container.querySelectorAll('.todo-row.virtual').forEach((row) => {
+    row.addEventListener('click', () => openTodoForm(state.todos.find((t) => t.id === row.dataset.todo)));
+  });
+  container.querySelectorAll('.todo-row:not(.virtual)').forEach((row) => {
     const id = row.dataset.todo;
     const toggle = () => doToggle(row, onToggled);
     attachSwipe(row, {
@@ -103,17 +118,17 @@ export function bindQuickAdd(container, getBase) {
     form.classList.add('typing');
     const p = parseQuick(v, todayKey(), getBase());
     const when = p.data ? formatRelative(p.data) : 'Sem data';
-    hint.textContent = `→ ${when}${p.hora ? ` · ${p.hora}` : ''}${p.prioridade ? ' · ✦ importante' : ''}`;
+    hint.textContent = `→ ${when}${p.hora ? ` · ${p.hora}` : ''}${p.repetir !== 'nunca' ? ` · ↻ ${REPEAT_TODO[p.repetir].toLowerCase()}` : ''}${p.prioridade ? ' · ✦ importante' : ''}`;
   };
   input.addEventListener('input', describe);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const p = parseQuick(input.value, todayKey(), getBase());
     if (!p.titulo) return input.focus();
-    await saveTodo({ titulo: p.titulo, data: p.data, hora: p.hora, prioridade: p.prioridade });
+    await saveTodo({ titulo: p.titulo, data: p.data, hora: p.hora, prioridade: p.prioridade, repetir: p.repetir });
     input.value = '';
     describe();
-    toast(`Tarefa · ${p.data ? formatRelative(p.data) : 'sem data'}${p.hora ? ` · ${p.hora}` : ''}`, { icon: '✦' });
+    toast(`Tarefa · ${p.data ? formatRelative(p.data) : 'sem data'}${p.hora ? ` · ${p.hora}` : ''}${p.repetir !== 'nunca' ? ' · ↻' : ''}`, { icon: '✦' });
     // O campo não é redesenhado: o teclado fica aberto para escrever a seguinte.
   });
 }
@@ -158,10 +173,12 @@ export function openTodoForm(existing = null, { date = todayKey() } = {}) {
           <div class="segmented" data-field="repetir">
             <button type="button" data-v="nunca">Não</button>
             <button type="button" data-v="diario">Diário</button>
+            <button type="button" data-v="uteis">Úteis</button>
             <button type="button" data-v="semanal">Semanal</button>
             <button type="button" data-v="mensal">Mensal</button>
           </div>
         </div>
+        <p class="group-footer" data-rep-help></p>
       </div>
 
       <div class="group-header">Passos</div>
@@ -200,6 +217,9 @@ export function openTodoForm(existing = null, { date = todayKey() } = {}) {
   };
   const sync = () => {
     form.querySelectorAll('[data-field=repetir] [data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === f.repetir)));
+    const help = form.querySelector('[data-rep-help]');
+    if (help) help.textContent = f.repetir === 'nunca' ? 'Dica: na escrita rápida podes escrever "todos os dias", "dias úteis" ou "todas as segundas".'
+      : `Aparece na agenda ${REPEAT_TODO[f.repetir].toLowerCase()}. Ao concluir, passa para a próxima vez.`;
     form.querySelectorAll('[data-if=data]').forEach((x) => (x.hidden = !f.comData));
     form.querySelectorAll('[data-if=hora]').forEach((x) => (x.hidden = !f.comData || !f.comHora));
   };
