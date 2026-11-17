@@ -1,0 +1,93 @@
+/* ==========================================================================
+   Modo computador. Só se aplica com html.desktop (ecrã ≥ 1024 px + rato/trackpad).
+   No iPhone esta classe nunca existe, por isso nada aqui o afeta.
+   ========================================================================== */
+.side-brand, .side-foot { display: none; }
+
+html.desktop body { background: #000; }
+html.desktop #app {
+  max-width: none; height: 100vh; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none;
+  --safe-top: 0px; --safe-bottom: 0px; --tabbar-h: 0px; --tabbar-bottom: 0px;
+}
+html.desktop #app::before { top: -260px; left: 120px; width: 900px; height: 520px; opacity: 0.9; }
+
+/* Barra lateral */
+html.desktop .tabbar {
+  left: 16px; right: auto; top: 16px; bottom: 16px; width: 228px; height: auto;
+  flex-direction: column; justify-content: flex-start; gap: 4px; padding: 18px 12px;
+  border-radius: 26px; background: rgba(16, 16, 18, 0.82);
+}
+html.desktop .side-brand {
+  display: flex; align-items: center; gap: 10px; padding: 4px 12px 22px;
+  font-size: 22px; font-weight: 800; letter-spacing: -0.6px; color: #fff;
+}
+html.desktop .side-brand span { color: var(--accent); text-shadow: var(--accent-glow); font-size: 22px; }
+html.desktop .tab {
+  flex: none; flex-direction: row; justify-content: flex-start; gap: 12px;
+  height: 48px; padding: 0 14px; border-radius: 14px; font-size: 15px; font-weight: 600; color: var(--label2);
+}
+html.desktop .tab svg { width: 21px; height: 21px; }
+html.desktop .tab:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+html.desktop .tab.in-view { color: #fff; }
+html.desktop .tab.in-view::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); }
+html.desktop .tab[aria-selected='true'] { background: var(--accent-soft); color: var(--accent); }
+html.desktop .tab[aria-selected='true']::after { background: var(--accent); box-shadow: var(--accent-glow); }
+html.desktop .side-foot { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding: 0 12px; font-size: 12px; color: var(--label3); }
+html.desktop .side-sync { color: var(--label2); }
+
+/* Colunas */
+html.desktop #screens {
+  position: absolute; inset: 16px 16px 16px 260px; z-index: 1;
+  display: grid; grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
+}
+html.desktop.wide #screens { grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr) minmax(0, 1.08fr); }
+html.desktop .screen {
+  position: relative; inset: auto; height: 100%; min-height: 0;
+  border: 1px solid var(--line); border-radius: 26px; overflow: hidden;
+  background: rgba(8, 8, 10, 0.72); container-type: inline-size;
+}
+html.desktop .screen.enter { animation: none; }
+html.desktop .screen.flash { animation: col-flash 0.7s ease-out; }
+@keyframes col-flash { 0% { box-shadow: 0 0 0 2px rgba(255, 42, 61, 0.7), 0 0 40px rgba(255, 42, 61, 0.25); } 100% { box-shadow: 0 0 0 0 transparent; } }
+html.desktop .navbar { height: 52px; padding-top: 0; }
+html.desktop .navbar.scrolled { background: rgba(14, 14, 16, 0.85); }
+html.desktop .scroller { padding: 52px 0 110px; scrollbar-width: thin; scrollbar-color: #2c2c30 transparent; }
+html.desktop .scroller::-webkit-scrollbar { width: 8px; }
+html.desktop .scroller::-webkit-scrollbar-thumb { background: #2c2c30; border-radius: 4px; }
+html.desktop .large-title { padding-top: 6px; }
+html.desktop .fab { bottom: 22px; right: 22px; }
+html.desktop .update-pill { bottom: 28px; left: calc(50% + 122px); }
+
+/* Painéis como janelas centradas */
+html.desktop .sheet {
+  left: 50%; right: auto; width: min(580px, calc(100% - 48px)); margin-left: calc(min(580px, 100% - 48px) / -2);
+  bottom: 24px; max-height: calc(100% - 48px); border: 1px solid var(--line); border-radius: 26px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+html.desktop .sheet:not(.open) { transform: translateY(calc(100% + 60px)); }
+html.desktop .sheet-large { height: min(880px, calc(100% - 48px)); }
+html.desktop .action-sheet { left: 50%; right: auto; width: 420px; margin-left: -210px; bottom: 32px; }
+html.desktop .sheet-backdrop { background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+/* Rato: efeitos ao passar por cima */
+html.desktop button, html.desktop [data-tile], html.desktop label.cell { cursor: pointer; }
+html.desktop .card:is(button, .obj-card, .goal-card):hover,
+html.desktop .htile:hover,
+html.desktop .habit-card:hover,
+html.desktop .cd:hover { border-color: rgba(255, 255, 255, 0.16); }
+html.desktop .task:hover, html.desktop .ev-row:hover, html.desktop .cell-btn:hover, html.desktop button.cell:hover { background: rgba(255, 255, 255, 0.035); }
+html.desktop .fab:hover { transform: scale(1.06); }
+html.desktop .btn-primary:hover { filter: brightness(1.08); }
+html.desktop .btn-secondary:hover { border-color: rgba(255, 255, 255, 0.18); }
+
+/* Colunas largas aproveitam o espaço (consultas de contentor: só no computador) */
+@container (min-width: 540px) {
+  .habit-grid { grid-template-columns: repeat(3, 1fr); }
+  .starter-grid { grid-template-columns: repeat(3, 1fr); }
+  .hd-ring { width: 120px; height: 120px; }
+  .hd-ring > div { width: 100px; height: 100px; }
+  .cat-grid { grid-template-columns: repeat(6, 1fr); }
+}
+@container (min-width: 680px) {
+  .habit-grid { grid-template-columns: repeat(4, 1fr); }
+}
